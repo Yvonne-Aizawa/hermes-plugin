@@ -68,6 +68,7 @@ type ChatMessage = {
     const [chatDraft, setChatDraft] = useState('')
     const [chatSending, setChatSending] = useState(false)
     const [chatError, setChatError] = useState('')
+    const [overlayVisible, setOverlayVisible] = useState(false)
 
     useEffect(function mountViewer() {
       const host = canvasHostRef.current as HTMLElement | null
@@ -267,6 +268,16 @@ type ChatMessage = {
         ),
         subtitle && React.createElement('div', { className: 'lumina-subtitle', role: 'status' }, subtitle),
         React.createElement(
+          'button',
+          {
+            className: 'lumina-overlay-toggle',
+            type: 'button',
+            'aria-expanded': overlayVisible,
+            onClick: () => setOverlayVisible((visible: boolean) => !visible),
+          },
+          overlayVisible ? 'Hide status' : 'Show status'
+        ),
+        overlayVisible && React.createElement(
           'div',
           { className: 'lumina-overlay' },
           React.createElement(

@@ -54,6 +54,28 @@
   height: 100%;
 }
 
+.lumina-overlay-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 4;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.62);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.lumina-overlay-toggle:hover {
+  border-color: color-mix(in srgb, var(--color-primary, #a78bfa) 62%, transparent);
+  background: rgba(30, 41, 59, 0.74);
+}
+
 .lumina-overlay {
   position: absolute;
   top: 1rem;
