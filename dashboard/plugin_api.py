@@ -17,7 +17,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 try:
     from ..avatar_state import get_state, patch_state
     from ..avatar_timeline import append_events, get_events, last_event_id, protocol
-    from ..platform import create_browser_message, get_outbound_messages
+    from ..platform import create_browser_message, get_chat_messages
 except ImportError:
     _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
     if str(_PLUGIN_ROOT) not in sys.path:
@@ -33,7 +33,7 @@ except ImportError:
         _PLATFORM_MODULE = importlib.util.module_from_spec(_PLATFORM_SPEC)
         _PLATFORM_SPEC.loader.exec_module(_PLATFORM_MODULE)
         create_browser_message = _PLATFORM_MODULE.create_browser_message
-        get_outbound_messages = _PLATFORM_MODULE.get_outbound_messages
+        get_chat_messages = _PLATFORM_MODULE.get_chat_messages
     except ImportError as exc:  # pragma: no cover - import failure should be explicit.
         raise RuntimeError(f"Unable to import Lumina avatar helpers: {exc}") from exc
 
@@ -140,9 +140,9 @@ async def chat_send(payload: dict[str, Any] = Body(default_factory=dict)) -> dic
 
 @router.get("/chat/messages")
 async def chat_messages(after: str | None = Query(default=None), limit: int = Query(default=100, ge=1, le=500)) -> dict[str, Any]:
-    """Return browser-visible Lumina web channel replies."""
+    """Return browser-visible Lumina web channel conversation history."""
 
-    messages = get_outbound_messages(after, limit=limit)
+    messages = get_chat_messages(after, limit=limit)
     return {
         "success": True,
         "after": after,

@@ -221,8 +221,11 @@ type ChatMessage = {
             const replies = response && Array.isArray(response.messages) ? response.messages : []
             if (replies.length > 0) {
               chatCursorRef.current = replies[replies.length - 1].id
-              pendingAssistantRef.current = false
-              setChatSending(false)
+              const hasAssistantReply = replies.some((message: LuminaChatMessage) => message.role === 'assistant')
+              if (hasAssistantReply) {
+                pendingAssistantRef.current = false
+                setChatSending(false)
+              }
               setChatMessages((previous: ChatMessage[]) => mergeChatMessages(previous, replies.map(chatMessageFromBridge)))
             }
           })
@@ -266,6 +269,9 @@ type ChatMessage = {
       sendLuminaChatMessage(sdk.fetchJSON, text)
         .then(function (response) {
           const bridgeMessage = response && response.message ? response.message : null
+          if (bridgeMessage && bridgeMessage.id) {
+            chatCursorRef.current = bridgeMessage.id
+          }
           setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === userMessage.id ? {
             ...message,
             id: bridgeMessage && bridgeMessage.id ? bridgeMessage.id : message.id,

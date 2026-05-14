@@ -134,25 +134,59 @@ else:
         return record
 
 
-    def get_outbound_messages(after: str | None = None, *, limit: int = 100) -> list[dict[str, Any]]:
-        """Return browser-visible assistant/system messages after an optional id."""
-
-        root = _chat_state_dir() / "outbox"
+    def _load_messages_from_subdir(subdir: str) -> list[dict[str, Any]]:
+        root = _chat_state_dir() / subdir
         messages: list[dict[str, Any]] = []
         for path in sorted(root.glob("*.json")):
             record = _safe_json_load(path)
             if record:
                 messages.append(record)
-        messages.sort(key=lambda item: (str(item.get("created_at") or ""), str(item.get("id") or "")))
-        if after:
-            seen = False
-            filtered: list[dict[str, Any]] = []
-            for message in messages:
-                if seen:
-                    filtered.append(message)
-                elif message.get("id") == after:
-                    seen = True
-            messages = filtered if seen else [m for m in messages if str(m.get("id") or "") > after]
+        return messages
+
+
+    def _sort_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(messages, key=lambda item: (str(item.get("created_at") or ""), str(item.get("id") or "")))
+
+
+    def _messages_after(messages: list[dict[str, Any]], after: str | None) -> list[dict[str, Any]]:
+        if not after:
+            return messages
+        seen = False
+        filtered: list[dict[str, Any]] = []
+        for message in messages:
+            if seen:
+                filtered.append(message)
+            elif message.get("id") == after:
+                seen = True
+        if seen:
+            return filtered
+        # Fallback for stale/unknown cursors.  This preserves older behavior and
+        # lets simple monotonic id cursors still advance when possible.
+        return [m for m in messages if str(m.get("id") or "") > after]
+
+
+    def get_chat_messages(after: str | None = None, *, limit: int = 100) -> list[dict[str, Any]]:
+        """Return browser-visible user + assistant messages after an optional id.
+
+        User messages move from inbox -> processing -> processed as the gateway
+        drains them.  Include all three locations so a page reload can rebuild
+        the whole visible conversation instead of showing only assistant outbox
+        messages.
+        """
+
+        messages: list[dict[str, Any]] = []
+        for subdir in ("processed", "processing", "inbox", "outbox"):
+            messages.extend(_load_messages_from_subdir(subdir))
+        messages = _sort_chat_messages(messages)
+        messages = _messages_after(messages, after)
+        return messages[: max(1, min(int(limit or 100), 500))]
+
+
+    def get_outbound_messages(after: str | None = None, *, limit: int = 100) -> list[dict[str, Any]]:
+        """Return browser-visible assistant/system messages after an optional id."""
+
+        messages = _sort_chat_messages(_load_messages_from_subdir("outbox"))
+        messages = _messages_after(messages, after)
         return messages[: max(1, min(int(limit or 100), 500))]
 
 
