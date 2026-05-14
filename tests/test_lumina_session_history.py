@@ -113,3 +113,44 @@ def test_chat_api_uses_session_history(tmp_path, monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert [m['text'] for m in data['messages']] == ['hello from session db', 'reply from session db']
+
+
+def test_chat_history_includes_tool_calls_and_results_from_sessiondb(tmp_path, monkeypatch):
+    home = tmp_path / 'hermes'
+    monkeypatch.setenv('HERMES_HOME', str(home))
+    monkeypatch.setenv('LUMINA_CHAT_STATE_DIR', str(tmp_path / 'chat_state'))
+    write_session_index(home, 'session-lumina')
+    db = SessionDB(db_path=home / 'state.db')
+    db.create_session(session_id='session-lumina', source='lumina_web', model='test-model')
+    db.append_message('session-lumina', 'user', 'please check the files')
+    db.append_message(
+        'session-lumina',
+        'assistant',
+        '',
+        tool_calls=[{
+            'id': 'call_search',
+            'type': 'function',
+            'function': {'name': 'search_files', 'arguments': '{"pattern":"*.py","target":"files"}'},
+        }],
+    )
+    db.append_message(
+        'session-lumina',
+        'tool',
+        '{"total_count": 2, "files": ["platform.py", "plugin_api.py"]}',
+        tool_call_id='call_search',
+        tool_name='search_files',
+    )
+    db.append_message('session-lumina', 'assistant', 'I found two Python files.')
+
+    messages = get_chat_messages()
+
+    assert [m['role'] for m in messages] == ['user', 'tool', 'tool', 'assistant']
+    assert messages[1]['text'] == 'Calling search_files'
+    assert messages[1]['metadata']['kind'] == 'tool_call'
+    assert messages[1]['metadata']['tool_name'] == 'search_files'
+    assert messages[1]['metadata']['tool_call_id'] == 'call_search'
+    assert messages[1]['metadata']['arguments'] == {"pattern": "*.py", "target": "files"}
+    assert messages[2]['text'] == '{"total_count": 2, "files": ["platform.py", "plugin_api.py"]}'
+    assert messages[2]['metadata']['kind'] == 'tool_result'
+    assert messages[2]['metadata']['tool_name'] == 'search_files'
+    assert messages[2]['metadata']['tool_call_id'] == 'call_search'

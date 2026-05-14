@@ -223,7 +223,26 @@ else:
         return str(value or "")
 
 
-    def _chat_message_from_db_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    def _parse_jsonish(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        if not stripped:
+            return value
+        try:
+            return json.loads(stripped)
+        except (TypeError, ValueError):
+            return value
+
+
+    def _base_session_metadata(row: dict[str, Any], *, kind: str | None = None) -> dict[str, Any]:
+        metadata: dict[str, Any] = {"source": "session", "session_id": row.get("session_id")}
+        if kind:
+            metadata["kind"] = kind
+        return metadata
+
+
+    def _chat_text_message_from_db_row(row: dict[str, Any]) -> dict[str, Any] | None:
         role = row.get("role")
         if role not in {"user", "assistant", "system"}:
             return None
@@ -237,8 +256,83 @@ else:
             "text": text,
             "chat_id": LUMINA_CHAT_ID,
             "created_at": _timestamp_to_iso(row.get("timestamp")),
-            "metadata": {"source": "session", "session_id": row.get("session_id")},
+            "metadata": _base_session_metadata(row),
         }
+
+
+    def _tool_call_messages_from_db_row(row: dict[str, Any]) -> list[dict[str, Any]]:
+        tool_calls = row.get("tool_calls")
+        if not tool_calls:
+            return []
+        if isinstance(tool_calls, dict):
+            tool_calls = [tool_calls]
+        if not isinstance(tool_calls, list):
+            return []
+
+        messages: list[dict[str, Any]] = []
+        for index, tool_call in enumerate(tool_calls):
+            if not isinstance(tool_call, dict):
+                continue
+            function = tool_call.get("function") if isinstance(tool_call.get("function"), dict) else {}
+            tool_name = str(function.get("name") or tool_call.get("name") or "tool")
+            tool_call_id = str(tool_call.get("id") or f"{row.get('id')}_{index}")
+            metadata = _base_session_metadata(row, kind="tool_call")
+            metadata.update({
+                "tool_name": tool_name,
+                "tool_call_id": tool_call_id,
+                "arguments": _parse_jsonish(function.get("arguments") or tool_call.get("arguments") or ""),
+            })
+            messages.append({
+                "id": f"session_{row.get('id')}_tool_call_{index}",
+                "role": "tool",
+                "text": f"Calling {tool_name}",
+                "chat_id": LUMINA_CHAT_ID,
+                "created_at": _timestamp_to_iso(row.get("timestamp")),
+                "metadata": metadata,
+            })
+        return messages
+
+
+    def _tool_result_message_from_db_row(row: dict[str, Any], tool_names_by_id: dict[str, str]) -> dict[str, Any] | None:
+        if row.get("role") != "tool":
+            return None
+        text = _message_text(row.get("content")).strip()
+        if not text:
+            return None
+        tool_call_id = str(row.get("tool_call_id") or "")
+        tool_name = str(row.get("tool_name") or tool_names_by_id.get(tool_call_id) or "tool")
+        metadata = _base_session_metadata(row, kind="tool_result")
+        metadata.update({"tool_name": tool_name, "tool_call_id": tool_call_id})
+        return {
+            "id": f"session_{row.get('id')}_tool_result",
+            "role": "tool",
+            "text": text,
+            "chat_id": LUMINA_CHAT_ID,
+            "created_at": _timestamp_to_iso(row.get("timestamp")),
+            "metadata": metadata,
+        }
+
+
+    def _chat_messages_from_db_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
+        tool_names_by_id: dict[str, str] = {}
+        for row in rows:
+            for tool_message in _tool_call_messages_from_db_row(row):
+                tool_call_id = str(tool_message.get("metadata", {}).get("tool_call_id") or "")
+                tool_name = str(tool_message.get("metadata", {}).get("tool_name") or "tool")
+                if tool_call_id:
+                    tool_names_by_id[tool_call_id] = tool_name
+                messages.append(tool_message)
+
+            tool_result = _tool_result_message_from_db_row(row, tool_names_by_id)
+            if tool_result:
+                messages.append(tool_result)
+                continue
+
+            text_message = _chat_text_message_from_db_row(row)
+            if text_message:
+                messages.append(text_message)
+        return messages
 
 
     def get_session_chat_messages(after: str | None = None, *, limit: int = 100) -> list[dict[str, Any]]:
@@ -253,7 +347,7 @@ else:
             rows = db.get_messages(resolved_session_id)
         except Exception:
             return []
-        messages = [message for row in rows if (message := _chat_message_from_db_row(row))]
+        messages = _chat_messages_from_db_rows(rows)
         messages = _messages_after(messages, after)
         return messages[: max(1, min(int(limit or 100), 500))]
 

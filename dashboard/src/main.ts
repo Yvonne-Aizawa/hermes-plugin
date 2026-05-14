@@ -24,9 +24,10 @@ declare global {
 
 type ChatMessage = {
   id: string
-  role: 'assistant' | 'user' | 'system'
+  role: 'assistant' | 'user' | 'system' | 'tool'
   text: string
   status?: 'sending' | 'sent' | 'error'
+  metadata?: Record<string, unknown>
 }
 
 (function registerLuminaDashboard() {
@@ -350,13 +351,7 @@ type ChatMessage = {
         React.createElement(
           'div',
           { className: 'lumina-chat-history', role: 'log', 'aria-live': 'polite' },
-          chatMessages.map((message: ChatMessage) => React.createElement(
-            'div',
-            { key: message.id, className: `lumina-chat-message lumina-chat-message-${message.role} ${message.status === 'error' ? 'lumina-chat-message-error' : ''}`.trim() },
-            React.createElement('span', { className: 'lumina-chat-role' }, message.role === 'user' ? 'You' : message.role === 'assistant' ? 'Lumina' : 'System'),
-            React.createElement('p', null, message.text),
-            message.status === 'sending' && React.createElement('span', { className: 'lumina-chat-status' }, message.role === 'user' ? 'queued for lumina_web…' : 'waiting for delivery…')
-          ))
+          chatMessages.map((message: ChatMessage) => renderChatMessage(message))
         ),
         chatError && React.createElement('div', { className: 'lumina-chat-error', role: 'alert' }, chatError),
         React.createElement(
@@ -387,12 +382,67 @@ type ChatMessage = {
   }
 
   function chatMessageFromBridge(message: LuminaChatMessage): ChatMessage {
-    const role = message.role === 'user' || message.role === 'assistant' || message.role === 'system' ? message.role : 'system'
+    const role = message.role === 'user' || message.role === 'assistant' || message.role === 'system' || message.role === 'tool' ? message.role : 'system'
     return {
       id: message.id,
       role,
       text: message.text || '',
       status: 'sent',
+      metadata: message.metadata || {},
+    }
+  }
+
+  function chatRoleLabel(message: ChatMessage): string {
+    if (message.role === 'user') return 'You'
+    if (message.role === 'assistant') return 'Lumina'
+    if (message.role === 'tool') {
+      const kind = String(message.metadata?.kind || '')
+      return kind === 'tool_result' ? 'Tool result' : 'Tool call'
+    }
+    return 'System'
+  }
+
+  function renderChatMessage(message: ChatMessage) {
+    const className = `lumina-chat-message lumina-chat-message-${message.role} ${message.status === 'error' ? 'lumina-chat-message-error' : ''}`.trim()
+    const children: any[] = [
+      React.createElement('span', { key: 'role', className: 'lumina-chat-role' }, chatRoleLabel(message)),
+    ]
+    const kind = String(message.metadata?.kind || '')
+    if (message.role !== 'tool' || kind !== 'tool_result') {
+      children.push(React.createElement('p', { key: 'text' }, message.text))
+    }
+
+    if (message.role === 'tool') {
+      const metadata = message.metadata || {}
+      const toolName = String(metadata.tool_name || 'tool')
+      const toolCallId = String(metadata.tool_call_id || '')
+      children.push(React.createElement(
+        'div',
+        { key: 'tool-details', className: 'lumina-chat-tool-details' },
+        React.createElement('span', null, toolName),
+        toolCallId && React.createElement('code', null, toolCallId)
+      ))
+      if (kind === 'tool_call' && metadata.arguments !== undefined && metadata.arguments !== '') {
+        children.push(React.createElement('pre', { key: 'tool-args', className: 'lumina-chat-tool-output' }, formatToolValue(metadata.arguments)))
+      }
+      if (kind === 'tool_result') {
+        children.push(React.createElement('pre', { key: 'tool-result', className: 'lumina-chat-tool-output' }, message.text))
+      }
+    }
+
+    if (message.status === 'sending') {
+      children.push(React.createElement('span', { key: 'status', className: 'lumina-chat-status' }, message.role === 'user' ? 'queued for lumina_web…' : 'waiting for delivery…'))
+    }
+
+    return React.createElement('div', { key: message.id, className }, children)
+  }
+
+  function formatToolValue(value: unknown): string {
+    if (typeof value === 'string') return value
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch (_err) {
+      return String(value)
     }
   }
 

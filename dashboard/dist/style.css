@@ -273,6 +273,54 @@
   background: rgba(88, 28, 135, 0.22);
 }
 
+.lumina-chat-message-tool {
+  align-self: stretch;
+  max-width: 100%;
+  border-color: rgba(250, 204, 21, 0.22);
+  background: rgba(113, 63, 18, 0.18);
+}
+
+.lumina-chat-tool-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.78rem;
+}
+
+.lumina-chat-tool-details span {
+  color: color-mix(in srgb, #facc15 72%, var(--color-foreground));
+  font-weight: 750;
+}
+
+.lumina-chat-tool-details code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
+  color: var(--color-muted-foreground);
+  background: rgba(2, 6, 23, 0.34);
+  font-size: 0.72rem;
+}
+
+.lumina-chat-tool-output {
+  max-height: 12rem;
+  overflow: auto;
+  margin: 0.6rem 0 0;
+  padding: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.7rem;
+  color: color-mix(in srgb, var(--color-foreground) 88%, var(--color-muted-foreground));
+  background: rgba(2, 6, 23, 0.36);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .lumina-chat-message-error {
   border-color: rgba(248, 113, 113, 0.38);
 }

@@ -59,7 +59,7 @@ export type AvatarEmitResponse = {
 
 export type LuminaChatMessage = {
   id: string
-  role: 'assistant' | 'user' | 'system' | string
+  role: 'assistant' | 'user' | 'system' | 'tool' | string
   text: string
   chat_id?: string
   reply_to?: string | null
