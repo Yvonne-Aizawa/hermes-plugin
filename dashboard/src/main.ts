@@ -1,5 +1,5 @@
 import { createAvatarViewerStatus, describeViewer, mountAvatarCanvas, type AvatarViewerHandle, type AvatarViewerStatus } from './avatar-viewer'
-import { fetchAvatarEvents, fetchAvatarProtocol, fetchAvatarState, summarizeAvatarState, type AvatarState, type AvatarTimelineEvent } from './api'
+import { emitAvatar, fetchAvatarEvents, fetchAvatarProtocol, fetchAvatarState, summarizeAvatarState, type AvatarState, type AvatarTimelineEvent } from './api'
 import { createTimelinePlayer, type TimelinePlayer } from './timeline-player'
 
 type HermesPluginSDK = {
@@ -20,6 +20,13 @@ declare global {
       register: (name: string, component: any) => void
     }
   }
+}
+
+type ChatMessage = {
+  id: string
+  role: 'assistant' | 'user' | 'system'
+  text: string
+  status?: 'sending' | 'sent' | 'error'
 }
 
 (function registerLuminaDashboard() {
@@ -48,6 +55,19 @@ declare global {
     const [subtitle, setSubtitle] = useState('')
     const [lastEvent, setLastEvent] = useState('No avatar events yet')
     const [viewerStatus, setViewerStatus]: [AvatarViewerStatus, (status: AvatarViewerStatus) => void] = useState(createAvatarViewerStatus)
+    const [chatMessages, setChatMessages] = useState(function initialMessages(): ChatMessage[] {
+      return [
+        {
+          id: 'welcome',
+          role: 'assistant',
+          text: 'I’m here, starlight. The real Hermes channel is next; this panel is wired as a local layout stub for now.',
+          status: 'sent',
+        },
+      ]
+    })
+    const [chatDraft, setChatDraft] = useState('')
+    const [chatSending, setChatSending] = useState(false)
+    const [chatError, setChatError] = useState('')
 
     useEffect(function mountViewer() {
       const host = canvasHostRef.current as HTMLElement | null
@@ -187,6 +207,52 @@ declare global {
       }
     }, [])
 
+    function handleChatSubmit(event: any) {
+      event.preventDefault()
+      const text = chatDraft.trim()
+      if (!text || chatSending) return
+
+      const now = Date.now()
+      const userMessage: ChatMessage = {
+        id: `user-${now}`,
+        role: 'user',
+        text,
+        status: 'sent',
+      }
+      const assistantText = 'Layout stub received. Soon this will route through the Lumina Hermes messaging channel instead of this local echo.'
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${now}`,
+        role: 'assistant',
+        text: assistantText,
+        status: 'sending',
+      }
+
+      setChatDraft('')
+      setChatError('')
+      setChatSending(true)
+      setChatMessages((previous: ChatMessage[]) => previous.concat(userMessage, assistantMessage))
+
+      emitAvatar(sdk.fetchJSON, {
+        state: { mood: 'warm', expression: 'happy' },
+        events: [
+          { type: 'speech.say', text: assistantText },
+          { type: 'avatar.expression', name: 'happy', intensity: 0.72 },
+        ],
+        ttl_ms: 30000,
+      })
+        .then(function () {
+          setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === assistantMessage.id ? { ...message, status: 'sent' } : message))
+        })
+        .catch(function (err: unknown) {
+          console.warn('Lumina chat stub could not emit avatar speech', err)
+          setChatError('Chat stub worked locally, but avatar speech emit failed. The real transport is still pending.')
+          setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === assistantMessage.id ? { ...message, status: 'error' } : message))
+        })
+        .finally(function () {
+          setChatSending(false)
+        })
+    }
+
     return React.createElement(
       'section',
       { className: 'lumina-page lumina-avatar-page' },
@@ -225,6 +291,55 @@ declare global {
           React.createElement('p', { className: 'lumina-status-copy' }, describeViewer(viewerStatus)),
           React.createElement('p', { className: 'lumina-status-copy lumina-backend-state' }, summarizeAvatarState(avatarState)),
           React.createElement('p', { className: 'lumina-event-copy' }, lastEvent)
+        )
+      ),
+      React.createElement(
+        'aside',
+        { className: 'lumina-chat-panel', 'aria-label': 'Lumina chat panel' },
+        React.createElement(
+          'div',
+          { className: 'lumina-chat-header' },
+          React.createElement('div', null,
+            React.createElement('p', { className: 'lumina-kicker' }, 'Embodied chat'),
+            React.createElement('h2', { className: 'lumina-chat-title' }, 'Talk with Lumina')
+          ),
+          React.createElement(Badge, { variant: chatSending ? 'secondary' : 'default' }, chatSending ? 'Thinking…' : 'Stub online')
+        ),
+        React.createElement('p', { className: 'lumina-chat-intro' }, 'This is the split-layout shell. Messages stay local for now, then Task 9C swaps the transport to the Hermes-native lumina_web channel.'),
+        React.createElement(
+          'div',
+          { className: 'lumina-chat-history', role: 'log', 'aria-live': 'polite' },
+          chatMessages.map((message: ChatMessage) => React.createElement(
+            'div',
+            { key: message.id, className: `lumina-chat-message lumina-chat-message-${message.role} ${message.status === 'error' ? 'lumina-chat-message-error' : ''}`.trim() },
+            React.createElement('span', { className: 'lumina-chat-role' }, message.role === 'user' ? 'You' : message.role === 'assistant' ? 'Lumina' : 'System'),
+            React.createElement('p', null, message.text),
+            message.status === 'sending' && React.createElement('span', { className: 'lumina-chat-status' }, 'sending speech event…')
+          ))
+        ),
+        chatError && React.createElement('div', { className: 'lumina-chat-error', role: 'alert' }, chatError),
+        React.createElement(
+          'form',
+          { className: 'lumina-chat-form', onSubmit: handleChatSubmit },
+          React.createElement('textarea', {
+            className: 'lumina-chat-input',
+            value: chatDraft,
+            rows: 3,
+            placeholder: 'Say something to Lumina…',
+            onChange: (event: any) => setChatDraft(event.target.value),
+            onKeyDown: (event: any) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                handleChatSubmit(event)
+              }
+            },
+            disabled: chatSending,
+          }),
+          React.createElement(
+            'button',
+            { className: 'lumina-chat-send', type: 'submit', disabled: chatSending || !chatDraft.trim() },
+            chatSending ? 'Sending…' : 'Send'
+          )
         )
       )
     )

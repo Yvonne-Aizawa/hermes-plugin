@@ -44,6 +44,19 @@ export type AvatarProtocol = {
   max_events: number
 }
 
+export type AvatarEmitPayload = {
+  state?: Partial<AvatarState>
+  events?: Array<Partial<AvatarTimelineEvent>>
+  ttl_ms?: number
+}
+
+export type AvatarEmitResponse = {
+  success: boolean
+  state: AvatarState
+  events: number
+  last_event_id: string | null
+}
+
 export type PluginFetchJSON = (url: string, options?: RequestInit) => Promise<any>
 
 declare global {
@@ -64,6 +77,14 @@ export function fetchAvatarState(fetchJSON: PluginFetchJSON): Promise<AvatarStat
 export function fetchAvatarEvents(fetchJSON: PluginFetchJSON, cursor: string | null): Promise<AvatarEventsResponse> {
   const suffix = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
   return pluginFetchJSON(fetchJSON, `/api/plugins/lumina_plugin/avatar/events${suffix}`)
+}
+
+export function emitAvatar(fetchJSON: PluginFetchJSON, payload: AvatarEmitPayload): Promise<AvatarEmitResponse> {
+  return pluginFetchJSON(fetchJSON, '/api/plugins/lumina_plugin/avatar/emit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
 }
 
 export function summarizeAvatarState(state: AvatarState | null): string {

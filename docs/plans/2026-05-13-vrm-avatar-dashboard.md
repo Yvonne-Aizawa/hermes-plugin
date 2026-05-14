@@ -913,7 +913,9 @@ git add docs/plans/2026-05-13-vrm-avatar-dashboard.md
 
 ---
 
-## Task 9B: Build dashboard chatbox UI skeleton
+## Task 9B: Build dashboard chatbox UI skeleton ✅
+
+**Status:** Completed. `/lumina` now uses a split desktop layout with the VRM avatar stage on the left and a chat panel on the right, stacking to a single column on narrower screens. The chat panel keeps local stub history, input, send/loading/error UI, and uses the existing avatar emit route to add a stub `speech.say` subtitle event; it does not call any model/provider API directly.
 
 **Objective:** Add the visible chat panel to `/lumina` without depending on the final Hermes platform adapter yet.
 
@@ -1183,4 +1185,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8 are complete, and Task 9A has identified the real integration path: implement `lumina_web` as a plugin-registered Hermes gateway platform adapter, with dashboard plugin routes acting only as an authenticated browser proxy. Next, build **Task 9B: dashboard chatbox UI skeleton** with a stub transport if needed, then implement **Task 9C: `LuminaWebAdapter` and real chat transport**. Do not call model/provider APIs directly from the dashboard plugin.
+Tasks 1–8, Task 9A, and Task 9B are complete. The visible `/lumina` split layout now exists with a local chat stub. Next, implement **Task 9C: `LuminaWebAdapter` and real chat transport** so browser messages enter the normal Hermes gateway/session pipeline. Do not call model/provider APIs directly from the dashboard plugin.
