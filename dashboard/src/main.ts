@@ -1,5 +1,5 @@
 import { createAvatarViewerStatus, describeViewer, mountAvatarCanvas, type AvatarViewerHandle, type AvatarViewerStatus } from './avatar-viewer'
-import { emitAvatar, fetchAvatarEvents, fetchAvatarProtocol, fetchAvatarState, summarizeAvatarState, type AvatarState, type AvatarTimelineEvent } from './api'
+import { fetchAvatarEvents, fetchAvatarProtocol, fetchAvatarState, fetchLuminaChatMessages, sendLuminaChatMessage, summarizeAvatarState, type AvatarState, type AvatarTimelineEvent, type LuminaChatMessage } from './api'
 import { createTimelinePlayer, type TimelinePlayer } from './timeline-player'
 
 type HermesPluginSDK = {
@@ -48,6 +48,8 @@ type ChatMessage = {
     const viewerRef = useRef(null) as { current: AvatarViewerHandle | null }
     const timelineRef = useRef(null) as { current: TimelinePlayer | null }
     const eventCursorRef = useRef(null) as { current: string | null }
+    const chatCursorRef = useRef(null) as { current: string | null }
+    const pendingAssistantRef = useRef(false) as { current: boolean }
     const [apiMessage, setApiMessage] = useState('Checking avatar protocol…')
     const [apiOk, setApiOk] = useState(false)
     const [currentAnimation, setCurrentAnimation] = useState('idle')
@@ -60,7 +62,7 @@ type ChatMessage = {
         {
           id: 'welcome',
           role: 'assistant',
-          text: 'I’m here, starlight. The real Hermes channel is next; this panel is wired as a local layout stub for now.',
+          text: 'I’m here, starlight. This panel now queues messages into the Hermes-native Lumina web channel; make sure the gateway has lumina_web enabled so I can answer here.',
           status: 'sent',
         },
       ]
@@ -208,6 +210,40 @@ type ChatMessage = {
       }
     }, [])
 
+    useEffect(function pollLuminaChat() {
+      let cancelled = false
+      let timer = 0
+
+      function pollReplies() {
+        fetchLuminaChatMessages(sdk.fetchJSON, chatCursorRef.current)
+          .then(function (response) {
+            if (cancelled) return
+            const replies = response && Array.isArray(response.messages) ? response.messages : []
+            if (replies.length > 0) {
+              chatCursorRef.current = replies[replies.length - 1].id
+              pendingAssistantRef.current = false
+              setChatSending(false)
+              setChatMessages((previous: ChatMessage[]) => mergeChatMessages(previous, replies.map(chatMessageFromBridge)))
+            }
+          })
+          .catch(function (err: unknown) {
+            if (!cancelled) {
+              console.warn('Lumina chat poll failed', err)
+              setChatError('Could not reach the Lumina web channel bridge. The dashboard API may need a restart.')
+            }
+          })
+          .finally(function () {
+            if (!cancelled) timer = window.setTimeout(pollReplies, pendingAssistantRef.current ? 500 : 1200)
+          })
+      }
+
+      pollReplies()
+      return function cleanupChatPolling() {
+        cancelled = true
+        window.clearTimeout(timer)
+      }
+    }, [])
+
     function handleChatSubmit(event: any) {
       event.preventDefault()
       const text = chatDraft.trim()
@@ -218,39 +254,30 @@ type ChatMessage = {
         id: `user-${now}`,
         role: 'user',
         text,
-        status: 'sent',
-      }
-      const assistantText = 'Layout stub received. Soon this will route through the Lumina Hermes messaging channel instead of this local echo.'
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${now}`,
-        role: 'assistant',
-        text: assistantText,
         status: 'sending',
       }
 
       setChatDraft('')
       setChatError('')
       setChatSending(true)
-      setChatMessages((previous: ChatMessage[]) => previous.concat(userMessage, assistantMessage))
+      pendingAssistantRef.current = true
+      setChatMessages((previous: ChatMessage[]) => previous.concat(userMessage))
 
-      emitAvatar(sdk.fetchJSON, {
-        state: { mood: 'warm', expression: 'happy' },
-        events: [
-          { type: 'speech.say', text: assistantText },
-          { type: 'avatar.expression', name: 'happy', intensity: 0.72 },
-        ],
-        ttl_ms: 30000,
-      })
-        .then(function () {
-          setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === assistantMessage.id ? { ...message, status: 'sent' } : message))
+      sendLuminaChatMessage(sdk.fetchJSON, text)
+        .then(function (response) {
+          const bridgeMessage = response && response.message ? response.message : null
+          setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === userMessage.id ? {
+            ...message,
+            id: bridgeMessage && bridgeMessage.id ? bridgeMessage.id : message.id,
+            status: 'sent',
+          } : message))
         })
         .catch(function (err: unknown) {
-          console.warn('Lumina chat stub could not emit avatar speech', err)
-          setChatError('Chat stub worked locally, but avatar speech emit failed. The real transport is still pending.')
-          setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === assistantMessage.id ? { ...message, status: 'error' } : message))
-        })
-        .finally(function () {
+          console.warn('Lumina chat send failed', err)
+          pendingAssistantRef.current = false
           setChatSending(false)
+          setChatError('Message could not be queued into lumina_web. Check the plugin API and gateway configuration.')
+          setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === userMessage.id ? { ...message, status: 'error' } : message))
         })
     }
 
@@ -314,9 +341,9 @@ type ChatMessage = {
             React.createElement('p', { className: 'lumina-kicker' }, 'Embodied chat'),
             React.createElement('h2', { className: 'lumina-chat-title' }, 'Talk with Lumina')
           ),
-          React.createElement(Badge, { variant: chatSending ? 'secondary' : 'default' }, chatSending ? 'Thinking…' : 'Stub online')
+          React.createElement(Badge, { variant: chatSending ? 'secondary' : 'default' }, chatSending ? 'Awaiting reply…' : 'lumina_web')
         ),
-        React.createElement('p', { className: 'lumina-chat-intro' }, 'This is the split-layout shell. Messages stay local for now, then Task 9C swaps the transport to the Hermes-native lumina_web channel.'),
+        React.createElement('p', { className: 'lumina-chat-intro' }, 'Messages are queued into the Hermes-native lumina_web platform adapter. Replies appear here and are mirrored into Lumina’s speech timeline.'),
         React.createElement(
           'div',
           { className: 'lumina-chat-history', role: 'log', 'aria-live': 'polite' },
@@ -325,7 +352,7 @@ type ChatMessage = {
             { key: message.id, className: `lumina-chat-message lumina-chat-message-${message.role} ${message.status === 'error' ? 'lumina-chat-message-error' : ''}`.trim() },
             React.createElement('span', { className: 'lumina-chat-role' }, message.role === 'user' ? 'You' : message.role === 'assistant' ? 'Lumina' : 'System'),
             React.createElement('p', null, message.text),
-            message.status === 'sending' && React.createElement('span', { className: 'lumina-chat-status' }, 'sending speech event…')
+            message.status === 'sending' && React.createElement('span', { className: 'lumina-chat-status' }, message.role === 'user' ? 'queued for lumina_web…' : 'waiting for delivery…')
           ))
         ),
         chatError && React.createElement('div', { className: 'lumina-chat-error', role: 'alert' }, chatError),
@@ -354,6 +381,29 @@ type ChatMessage = {
         )
       )
     )
+  }
+
+  function chatMessageFromBridge(message: LuminaChatMessage): ChatMessage {
+    const role = message.role === 'user' || message.role === 'assistant' || message.role === 'system' ? message.role : 'system'
+    return {
+      id: message.id,
+      role,
+      text: message.text || '',
+      status: 'sent',
+    }
+  }
+
+  function mergeChatMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+    if (incoming.length === 0) return existing
+    const seen = new Set(existing.map((message) => message.id))
+    const merged = existing.slice()
+    incoming.forEach((message) => {
+      if (!seen.has(message.id)) {
+        seen.add(message.id)
+        merged.push(message)
+      }
+    })
+    return merged
   }
 
   function statusPill(label: string, value: string) {

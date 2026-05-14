@@ -949,9 +949,11 @@ git add dashboard/src dashboard/dist dashboard/plugin_api.py
 
 ---
 
-## Task 9C: Connect chatbox to Hermes-native Lumina web channel
+## Task 9C: Connect chatbox to Hermes-native Lumina web channel ✅
 
 **Objective:** Replace the stub transport with a real Hermes message pipeline integration so `/lumina` behaves like a browser messaging platform.
+
+**Status:** Implemented MVP polling/file-queue bridge. `lumina_web` is registered as a plugin platform adapter, the dashboard chat panel queues browser messages through plugin API routes, assistant replies are polled back from the adapter outbox, and reply text is mirrored into the avatar timeline as `speech.say`. Gateway config still needs `platforms.lumina_web.enabled=true` and a gateway/dashboard restart to activate the adapter in a live process.
 
 **Files:**
 

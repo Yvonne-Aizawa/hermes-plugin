@@ -2,7 +2,9 @@ name: lumina_plugin
 version: 1.0.0
 description: "Lumina's embodied avatar/dashboard plugin for Hermes. Provides renderer-neutral avatar state and ordered timeline tools for the /lumina interface."
 author: lumina
-kind: backend
+kind: platform
 provides_tools:
   - avatar_get_state
   - avatar_emit
+provides_platforms:
+  - lumina_web

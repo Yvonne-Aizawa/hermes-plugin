@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import tools
+from . import platform, tools
 
 _TOOLS = [
     {
@@ -23,7 +23,23 @@ _TOOLS = [
 
 
 def register(ctx) -> None:
-    """Register Lumina avatar tools. Called once by the plugin loader."""
+    """Register Lumina avatar tools and the Lumina web platform adapter."""
+    ctx.register_platform(
+        name=platform.PLATFORM_NAME,
+        label="Lumina Web",
+        adapter_factory=platform.make_adapter,
+        check_fn=platform._platform_available,
+        validate_config=platform.validate_config,
+        emoji="✨",
+        platform_hint=(
+            "You are chatting through the /lumina embodied browser interface. "
+            "Reply naturally for a companion chat surface; assistant replies are mirrored "
+            "into Lumina's avatar speech timeline by the platform adapter."
+        ),
+        pii_safe=True,
+        allow_update_command=False,
+    )
+
     for tool_def in _TOOLS:
         ctx.register_tool(
             name=tool_def["name"],

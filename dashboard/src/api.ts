@@ -57,6 +57,28 @@ export type AvatarEmitResponse = {
   last_event_id: string | null
 }
 
+export type LuminaChatMessage = {
+  id: string
+  role: 'assistant' | 'user' | 'system' | string
+  text: string
+  chat_id?: string
+  reply_to?: string | null
+  created_at?: string
+  metadata?: Record<string, unknown>
+}
+
+export type LuminaChatSendResponse = {
+  success: boolean
+  message: LuminaChatMessage
+}
+
+export type LuminaChatMessagesResponse = {
+  success: boolean
+  after: string | null
+  messages: LuminaChatMessage[]
+  last_message_id: string | null
+}
+
 export type PluginFetchJSON = (url: string, options?: RequestInit) => Promise<any>
 
 declare global {
@@ -85,6 +107,19 @@ export function emitAvatar(fetchJSON: PluginFetchJSON, payload: AvatarEmitPayloa
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
+}
+
+export function sendLuminaChatMessage(fetchJSON: PluginFetchJSON, text: string): Promise<LuminaChatSendResponse> {
+  return pluginFetchJSON(fetchJSON, '/api/plugins/lumina_plugin/chat/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, client_id: 'dashboard:default', user_id: 'browser-user', user_name: 'Browser user' }),
+  })
+}
+
+export function fetchLuminaChatMessages(fetchJSON: PluginFetchJSON, after: string | null): Promise<LuminaChatMessagesResponse> {
+  const suffix = after ? `?after=${encodeURIComponent(after)}` : ''
+  return pluginFetchJSON(fetchJSON, `/api/plugins/lumina_plugin/chat/messages${suffix}`)
 }
 
 export function summarizeAvatarState(state: AvatarState | null): string {
