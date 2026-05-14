@@ -4,9 +4,9 @@
 
 **Goal:** Turn `/lumina` into Lumina's primary embodied interface: a browser chat + Three.js/VRM avatar renderer where conversation text, subtitles, expressions, animations, and ordered multimodal action timelines feel like one coherent companion experience.
 
-**Architecture:** Keep rendering and interaction UI in the browser dashboard plugin, while keeping avatar state/timeline orchestration in the Lumina plugin backend/tool layer. The dashboard tab renders a VRM model in WebGL and should grow a local chat panel for embodied Lumina conversations; `plugin_api.py` exposes renderer-neutral avatar state plus queued avatar events; Hermes tools mutate shared state and append ordered speech/gesture/expression actions so Lumina can speak, wave, pause, then ask a follow-up in one coherent turn. Normal Hermes sessions may keep avatar tools during development/debugging, but the long-term product direction is for avatar-specific tools and context to live primarily in the dedicated Lumina chat surface rather than every general-purpose session.
+**Architecture:** Keep rendering and interaction UI in the browser dashboard plugin, while keeping avatar state/timeline orchestration in the Lumina plugin backend/tool layer. The dashboard tab renders a VRM model in WebGL and should grow a local chat panel for embodied Lumina conversations; that chat panel should act like a Hermes messaging platform/channel, similar in spirit to Telegram or Mattermost, not as a direct model/provider client. `plugin_api.py` exposes renderer-neutral avatar state plus queued avatar events; a Lumina web messaging adapter should submit browser chat messages into the normal Hermes gateway/session pipeline and deliver assistant replies back to the page with avatar choreography metadata. Normal Hermes sessions may keep avatar tools during development/debugging, but the long-term product direction is for avatar-specific tools and context to live primarily in the dedicated Lumina chat surface rather than every general-purpose session.
 
-**Tech Stack:** Hermes dashboard plugin, FastAPI plugin routes, Hermes session/chat APIs or a small plugin chat bridge, Hermes tools, shared file-backed avatar state, action timeline/event queue, Three.js, `@pixiv/three-vrm`, Vite or esbuild bundle, local plugin assets (`.vrm`, `.vrma` animation clips), browser WebGL, future WebSocket/SSE bridge for dashboard and Meta Quest renderers.
+**Tech Stack:** Hermes dashboard plugin, FastAPI plugin routes, Hermes gateway/messaging platform adapter patterns, Hermes session/chat pipeline, Hermes tools, shared file-backed avatar state, action timeline/event queue, Three.js, `@pixiv/three-vrm`, Vite or esbuild bundle, local plugin assets (`.vrm`, `.vrma` animation clips), browser WebGL, future WebSocket/SSE bridge for dashboard and Meta Quest renderers.
 
 **Date:** 2026-05-13
 
@@ -742,7 +742,203 @@ git add tools.py __init__.py plugin.yaml avatar_state.py avatar_timeline.py
 
 ---
 
-## Task 9: Add renderer-agnostic event transport notes for Meta Quest
+## Embodied chat direction: Lumina as a Hermes messaging surface
+
+The `/lumina` chatbox should be a **Hermes-native messaging surface**, not a direct OpenAI/model API client and not a new model provider. Treat it like a local browser messaging platform: user messages originate in the dashboard page, enter the normal Hermes message/session pipeline, and assistant replies are delivered back to the page with optional avatar timeline events.
+
+Target mental model:
+
+```text
+/lumina browser page
+  -> Lumina web chat transport
+  -> Hermes gateway/message dispatcher
+  -> normal Hermes agent session
+  -> assistant response + tool calls/avatar events
+  -> Lumina web chat transport
+  -> dashboard message list + subtitles + VRM timeline
+```
+
+### Why platform-style instead of provider-style
+
+- Providers are for model backends; `/lumina` is a chat surface.
+- The chatbox should inherit Hermes memory, skills, tools, profiles, model routing, and session history.
+- The dashboard should not duplicate model/provider configuration or call OpenAI-compatible APIs directly.
+- This keeps Telegram, Mattermost, CLI, and `/lumina` conceptually aligned: different surfaces, same Hermes brain.
+
+### Desired Lumina web channel behavior
+
+- Stable platform/source identity, for example `lumina_web` or `lumina:dashboard:default`.
+- Stable user/channel identity so sessions can resume instead of creating a new brain every page refresh.
+- Browser client posts user text and receives assistant messages through a dashboard-authenticated route or WebSocket/SSE stream.
+- Assistant message text should be mirrored into avatar timeline events, at minimum `speech.say` subtitles.
+- Later, the assistant or adapter can add expression/animation events without requiring all normal sessions to carry avatar-specific instructions.
+
+### Layout target for the chatbox
+
+Desktop layout:
+
+```text
+┌───────────────────────────────┬──────────────────────────┐
+│                               │ Chat                     │
+│         VRM Avatar            │ ┌──────────────────────┐ │
+│                               │ │ user/assistant msgs  │ │
+│                               │ └──────────────────────┘ │
+│                               │ [message input      ↵]  │
+├───────────────────────────────┴──────────────────────────┤
+│ subtitle / current speech line                            │
+└───────────────────────────────────────────────────────────┘
+```
+
+Responsive fallback: avatar on top, chat below. Future Quest/browser-XR layout can make the avatar full-screen and render chat as an overlay panel.
+
+### Implementation discovery needed
+
+Before building the real Hermes-backed chat loop, inspect the Hermes gateway/platform code and API server adapter to choose the least invasive integration point. Prefer a plugin/local adapter if Hermes supports community messaging platforms cleanly. If the platform adapter path needs upstream Hermes changes, use a dashboard-only echo/stub endpoint only as a temporary UI spike, not as the final architecture.
+
+---
+
+## Task 9A: Investigate Hermes messaging platform adapter path
+
+**Objective:** Find the correct Hermes-native way for `/lumina` to submit browser messages as a platform/channel, similar to Telegram or Mattermost, without calling a model/provider API directly.
+
+**Files:**
+
+- Inspect: `~/.hermes/hermes-agent/gateway/platforms/`
+- Inspect: `~/.hermes/hermes-agent/gateway/`
+- Inspect: API server / dashboard integration files in `~/.hermes/hermes-agent/`
+- Modify: this plan with the chosen integration point
+- Optional later: create `docs/lumina-web-chat-platform.md`
+
+**Steps:**
+
+1. Locate how Telegram/Mattermost platform adapters create incoming messages and delivery targets.
+2. Locate how the API server or webhook adapters inject messages into Hermes sessions.
+3. Identify whether a user plugin can register a messaging platform adapter, or whether this requires a small Hermes core change.
+4. Decide channel identity format, for example `lumina:dashboard:default`.
+5. Decide delivery path from Hermes back to the browser: polling, SSE, WebSocket, or an existing dashboard event bus.
+6. Record the chosen design in this plan before implementation.
+
+**Acceptance criteria:**
+
+- The plan names the exact Hermes files/classes/routes to reuse or extend.
+- The design preserves normal Hermes session/memory/tool behavior.
+- No model provider or OpenAI-compatible API call is introduced in `lumina_plugin`.
+- It is clear how assistant replies get back to the browser chat panel.
+
+**Commit:**
+
+```bash
+git add docs/plans/2026-05-13-vrm-avatar-dashboard.md
+ git commit -m "docs: plan Lumina web chat platform adapter"
+```
+
+---
+
+## Task 9B: Build dashboard chatbox UI skeleton
+
+**Objective:** Add the visible chat panel to `/lumina` without depending on the final Hermes platform adapter yet.
+
+**Files:**
+
+- Modify: `dashboard/src/main.ts`
+- Modify: `dashboard/src/api.ts`
+- Modify: `dashboard/src/styles.css` or the current dashboard stylesheet
+- Modify: `dashboard/dist/` after building
+
+**Behavior:**
+
+- Desktop: avatar left, chat panel right.
+- Narrow screen: avatar top, chat panel below.
+- Chat panel includes message history, input, send button, loading/error state.
+- Initial backend may use a temporary stub route only to prove UX, but the code should make the transport easy to swap for the real Lumina web platform route.
+
+**Acceptance criteria:**
+
+- `/lumina` still loads the VRM avatar.
+- User can type a message and see it appear in the local chat history.
+- Stub assistant response appears in the chat history and emits a `speech.say` subtitle/avatar event.
+- The UI does not call any external model/provider API directly.
+
+**Commit:**
+
+```bash
+git add dashboard/src dashboard/dist dashboard/plugin_api.py
+ git commit -m "feat: add Lumina dashboard chatbox skeleton"
+```
+
+---
+
+## Task 9C: Connect chatbox to Hermes-native Lumina web channel
+
+**Objective:** Replace the stub transport with a real Hermes message pipeline integration so `/lumina` behaves like a browser messaging platform.
+
+**Files:**
+
+- Modify/create: files identified in Task 9A
+- Modify: `dashboard/plugin_api.py` if it remains the authenticated bridge
+- Modify: `dashboard/src/api.ts`
+- Modify: `dashboard/src/main.ts`
+- Modify: `dashboard/dist/`
+- Create/update: `docs/lumina-web-chat-platform.md`
+
+**Behavior:**
+
+- Browser sends a user message to the Lumina web channel.
+- Hermes handles it as a normal agent turn with memory, skills, and tools.
+- Assistant reply is delivered back to the same browser session/channel.
+- Reply text is also appended as a `speech.say` avatar timeline event.
+- The adapter can later map explicit avatar metadata/tool calls into richer animation/expression events.
+
+**Acceptance criteria:**
+
+- A `/lumina` chat message creates or resumes a Hermes session with stable Lumina channel identity.
+- The assistant response appears in the browser chat panel.
+- The same response appears as subtitle/speech event in the avatar timeline.
+- Existing Telegram/Mattermost behavior is unaffected.
+- The implementation has no direct model/provider API calls.
+
+**Commit:**
+
+```bash
+git add <changed Hermes/lumina files> docs/lumina-web-chat-platform.md
+ git commit -m "feat: connect Lumina chatbox to Hermes messaging pipeline"
+```
+
+---
+
+## Task 9D: Scope avatar behavior to Lumina surface
+
+**Objective:** Reduce pressure on general-purpose Hermes sessions by making `/lumina` the primary embodied chat context while keeping global avatar tools available for debugging.
+
+**Files:**
+
+- Modify: `README.md`
+- Modify: `docs/avatar-dashboard.md` once it exists
+- Modify: this plan
+- Optional: Hermes profile/toolset config notes
+
+**Behavior:**
+
+- `/lumina` sessions receive embodied/persona/avatar-choreography guidance.
+- Normal Telegram/Mattermost/general sessions do not need heavy avatar-specific prompting by default.
+- `avatar_get_state` and `avatar_emit` remain available for development/debugging unless a future toolset policy moves them behind the Lumina surface.
+
+**Acceptance criteria:**
+
+- Docs explain where avatar-specific interaction should happen.
+- General Hermes sessions remain clean and broadly useful.
+- The Lumina page can still drive the avatar without requiring every session to carry the full avatar context.
+
+**Commit:**
+
+```bash
+git add README.md docs/plans/2026-05-13-vrm-avatar-dashboard.md docs/avatar-dashboard.md
+ git commit -m "docs: scope embodied chat behavior to Lumina surface"
+```
+
+---
+
+## Task 10: Add renderer-agnostic event transport notes for Meta Quest
 
 **Objective:** Keep the dashboard implementation aligned with the future Meta Quest app, where Quest renders the body locally while Hermes remains the brain.
 
@@ -787,7 +983,7 @@ git add docs/avatar-dashboard.md docs/xr-quest-bridge.md docs/plans/2026-05-13-v
 
 ---
 
-## Task 10: Improve liveliness without overbuilding
+## Task 11: Improve liveliness without overbuilding
 
 **Objective:** Add small low-risk behaviors that make the avatar feel alive.
 
@@ -828,7 +1024,7 @@ git add dashboard/src dashboard/dist
 
 ---
 
-## Task 11: Document operator workflow
+## Task 12: Document operator workflow
 
 **Objective:** Make future work obvious.
 
@@ -868,10 +1064,11 @@ git add docs/avatar-dashboard.md docs/plans/2026-05-13-vrm-avatar-dashboard.md
 - Are the current FBX animations compatible with the VRM rig, or should we use `.vrma` / Mixamo retargeting / procedural bone motion?
 - Should the avatar live only on `/lumina`, or eventually become a persistent dashboard slot/overlay?
 - Should state remain profile-level/global, or should the store add per-session/per-renderer namespaces later?
-- Should the first control transport be polling, Server-Sent Events, or WebSocket?
+- Should the first browser reply transport for the Lumina web chat surface be polling, Server-Sent Events, WebSocket, or an existing dashboard event bus?
+- Can the Lumina web chat surface be implemented as a user/plugin messaging platform adapter, or does Hermes core need a small gateway extension?
 - Should Quest consume the same timeline over WebSocket, or a richer WebRTC channel once realtime audio is needed?
 
-MVP answer: use `/lumina`, profile-level file-backed shared state in `~/.hermes/state/lumina_plugin/`, polling, local VRM/VRMA assets, and reliable semantic animations such as `idle`, `greeting`, `wave`, `dance`, and `spin`.
+MVP answer: use `/lumina`, profile-level file-backed shared state in `~/.hermes/state/lumina_plugin/`, polling for avatar state/events, local VRM/VRMA assets, reliable semantic animations such as `idle`, `greeting`, `wave`, `dance`, and `spin`, and a Hermes-native `lumina_web` messaging surface for chat rather than a direct provider/API client.
 
 ---
 
@@ -889,8 +1086,20 @@ The first milestone is complete when:
 - there is at least one Hermes tool that can trigger that state change.
 - dashboard restart and fresh Hermes session behavior are documented.
 
+## Definition of done for embodied chat milestone
+
+The second milestone is complete when:
+
+- `/lumina` has a visible chat panel integrated with the avatar layout.
+- the chat transport is designed as a Hermes messaging surface/channel, not a model provider or direct OpenAI/API client.
+- a user message from the browser creates or resumes a stable Lumina Hermes session/channel.
+- assistant replies appear in the browser chat panel.
+- assistant reply text also appears as `speech.say` subtitles/avatar timeline events.
+- the implementation path for streaming/push delivery is documented, even if v1 uses polling.
+- normal Telegram/Mattermost/general Hermes sessions remain unaffected.
+
 ---
 
 ## Recommended next step
 
-Tasks 1–8 are complete. Next, patch documentation/operator notes for the file-backed state architecture, then start **Task 10: Improve liveliness without overbuilding**. The highest-value visible work now is subtle idling/speaking behavior because the model loads, VRMA animations play, and tool → dashboard state propagation is verified.
+Tasks 1–8 are complete. The next product direction is the `/lumina` chatbox as a Hermes-native messaging surface. Start with **Task 9A: Investigate Hermes messaging platform adapter path**, then build **Task 9B: dashboard chatbox UI skeleton** once the integration point is clear. Do not call model/provider APIs directly from the dashboard plugin.
