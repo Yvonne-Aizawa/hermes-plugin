@@ -11,6 +11,7 @@
 - Assistant replies are sent back through `LuminaWebAdapter.send(...)`, which writes short-lived browser delivery messages under `~/.hermes/state/lumina_plugin/chat/outbox/`.
 - The dashboard polls `GET /api/plugins/lumina_plugin/chat/messages?after=...`; durable reload history comes from Hermes `SessionDB` for the stable `lumina_web` session, while only pending `inbox/` and `processing/` transport messages are overlaid for immediate send feedback. `processed/` and `outbox/` files are not durable UI history.
 - Session-backed history includes `user`, `assistant`, `system`, and browser-visible `tool` entries. Assistant `tool_calls` become `Tool call` cards with parsed arguments; `tool` rows become `Tool result` cards with scrollable output previews.
+- The browser settings modal stores display preferences in `localStorage` under `lumina.chat.settings`. Tool call display modes are `full` (names, arguments, results), `compact` (tool names only), and `none` (hide tool entries).
 - The same assistant reply text is mirrored into the avatar timeline as `speech.say` plus a light expression event.
 
 ## Stable channel identity

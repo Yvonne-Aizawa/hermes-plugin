@@ -17,7 +17,7 @@ def test_lumina_chat_message_type_accepts_tool_role_and_metadata():
 def test_lumina_chat_renders_tool_calls_with_distinct_label_and_details():
     main = MAIN_TS.read_text(encoding='utf-8')
 
-    assert 'renderChatMessage(message)' in main
+    assert 'renderChatMessage(message, toolCallMode)' in main
     assert "message.role === 'tool'" in main
     assert "kind === 'tool_call'" in main
     assert "kind === 'tool_result'" in main

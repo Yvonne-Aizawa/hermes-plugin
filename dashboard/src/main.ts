@@ -22,6 +22,12 @@ declare global {
   }
 }
 
+type ToolCallMode = 'full' | 'compact' | 'none'
+
+type LuminaChatSettings = {
+  toolCallMode: ToolCallMode
+}
+
 type ChatMessage = {
   id: string
   role: 'assistant' | 'user' | 'system' | 'tool'
@@ -29,6 +35,14 @@ type ChatMessage = {
   status?: 'sending' | 'sent' | 'error'
   metadata?: Record<string, unknown>
 }
+
+const LUMINA_SETTINGS_STORAGE_KEY = 'lumina.chat.settings'
+const DEFAULT_CHAT_SETTINGS: LuminaChatSettings = { toolCallMode: 'full' }
+const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; description: string }> = [
+  { value: 'full', label: 'Full', description: 'Show tool names, arguments, and result previews.' },
+  { value: 'compact', label: 'Compact', description: 'Show only tool call/result names.' },
+  { value: 'none', label: 'None', description: 'Hide tool calls and tool results entirely.' },
+];
 
 (function registerLuminaDashboard() {
   'use strict'
@@ -43,6 +57,51 @@ type ChatMessage = {
   const { React } = sdk
   const { useEffect, useRef, useState } = sdk.hooks
   const { Badge } = sdk.components
+
+  function isToolCallMode(value: unknown): value is ToolCallMode {
+    return value === 'full' || value === 'compact' || value === 'none'
+  }
+
+  function loadLuminaChatSettings(): LuminaChatSettings {
+    try {
+      const raw = window.localStorage.getItem(LUMINA_SETTINGS_STORAGE_KEY)
+      if (!raw) return { ...DEFAULT_CHAT_SETTINGS }
+      const parsed = JSON.parse(raw)
+      return {
+        ...DEFAULT_CHAT_SETTINGS,
+        ...(parsed || {}),
+        toolCallMode: isToolCallMode(parsed?.toolCallMode) ? parsed.toolCallMode : DEFAULT_CHAT_SETTINGS.toolCallMode,
+      }
+    } catch (_err) {
+      return { ...DEFAULT_CHAT_SETTINGS }
+    }
+  }
+
+  function saveLuminaChatSettings(settings: LuminaChatSettings) {
+    try {
+      window.localStorage.setItem(LUMINA_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    } catch (err) {
+      console.warn('Lumina chat settings could not be saved', err)
+    }
+  }
+
+  function renderToolCallModeOption(value: ToolCallMode, label: string, description: string, selected: ToolCallMode, setChatSettings: any) {
+    return React.createElement(
+      'label',
+      { key: value, className: `lumina-chat-settings-option ${selected === value ? 'lumina-chat-settings-option-active' : ''}`.trim() },
+      React.createElement('input', {
+        type: 'radio',
+        name: 'lumina-tool-call-mode',
+        value,
+        checked: selected === value,
+        onChange: () => setChatSettings((previous: LuminaChatSettings) => ({ ...previous, toolCallMode: value })),
+      }),
+      React.createElement('span', null,
+        React.createElement('strong', null, label),
+        React.createElement('small', null, description)
+      )
+    )
+  }
 
   function LuminaAvatarPage() {
     const canvasHostRef = useRef(null)
@@ -71,7 +130,15 @@ type ChatMessage = {
     const [chatDraft, setChatDraft] = useState('')
     const [chatSending, setChatSending] = useState(false)
     const [chatError, setChatError] = useState('')
+    const [chatSettings, setChatSettings] = useState(loadLuminaChatSettings)
+    const [chatSettingsOpen, setChatSettingsOpen] = useState(false)
     const [overlayVisible, setOverlayVisible] = useState(false)
+    const toolCallMode = chatSettings.toolCallMode
+    const visibleChatMessages = chatMessages.filter((message: ChatMessage) => message.role !== 'tool' || toolCallMode !== 'none')
+
+    useEffect(function persistLuminaChatSettings() {
+      saveLuminaChatSettings(chatSettings)
+    }, [chatSettings])
 
     useEffect(function mountViewer() {
       const host = canvasHostRef.current as HTMLElement | null
@@ -345,13 +412,24 @@ type ChatMessage = {
             React.createElement('p', { className: 'lumina-kicker' }, 'Embodied chat'),
             React.createElement('h2', { className: 'lumina-chat-title' }, 'Talk with Lumina')
           ),
-          React.createElement(Badge, { variant: chatSending ? 'secondary' : 'default' }, chatSending ? 'Awaiting reply…' : 'lumina_web')
+          React.createElement(Badge, { variant: chatSending ? 'secondary' : 'default' }, chatSending ? 'Awaiting reply…' : 'lumina_web'),
+          React.createElement(
+            'button',
+            {
+              className: 'lumina-chat-settings-button',
+              type: 'button',
+              'aria-haspopup': 'dialog',
+              'aria-expanded': chatSettingsOpen,
+              onClick: () => setChatSettingsOpen(true),
+            },
+            'Settings'
+          )
         ),
         React.createElement('p', { className: 'lumina-chat-intro' }, 'Messages are queued into the Hermes-native lumina_web platform adapter. Replies appear here and are mirrored into Lumina’s speech timeline.'),
         React.createElement(
           'div',
           { className: 'lumina-chat-history', role: 'log', 'aria-live': 'polite' },
-          chatMessages.map((message: ChatMessage) => renderChatMessage(message))
+          visibleChatMessages.map((message: ChatMessage) => renderChatMessage(message, toolCallMode))
         ),
         chatError && React.createElement('div', { className: 'lumina-chat-error', role: 'alert' }, chatError),
         React.createElement(
@@ -375,6 +453,28 @@ type ChatMessage = {
             'button',
             { className: 'lumina-chat-send', type: 'submit', disabled: chatSending || !chatDraft.trim() },
             chatSending ? 'Sending…' : 'Send'
+          )
+        ),
+        chatSettingsOpen && React.createElement(
+          'div',
+          { className: 'lumina-chat-settings-backdrop', role: 'presentation', onClick: () => setChatSettingsOpen(false) },
+          React.createElement(
+            'div',
+            {
+              className: 'lumina-chat-settings-modal',
+              role: 'dialog',
+              'aria-modal': 'true',
+              'aria-label': 'Lumina chat settings',
+              onClick: (event: any) => event.stopPropagation(),
+            },
+            React.createElement(
+              'div',
+              { className: 'lumina-chat-settings-header' },
+              React.createElement('h3', null, 'Chat settings'),
+              React.createElement('button', { type: 'button', onClick: () => setChatSettingsOpen(false), 'aria-label': 'Close settings' }, '×')
+            ),
+            React.createElement('p', { className: 'lumina-chat-settings-label' }, 'Tool call display'),
+            TOOL_CALL_MODE_OPTIONS.map((option) => renderToolCallModeOption(option.value, option.label, option.description, toolCallMode, setChatSettings))
           )
         )
       )
@@ -402,12 +502,14 @@ type ChatMessage = {
     return 'System'
   }
 
-  function renderChatMessage(message: ChatMessage) {
-    const className = `lumina-chat-message lumina-chat-message-${message.role} ${message.status === 'error' ? 'lumina-chat-message-error' : ''}`.trim()
+  function renderChatMessage(message: ChatMessage, toolCallMode: ToolCallMode) {
+    const kind = String(message.metadata?.kind || '')
+    const toolIsCompact = toolCallMode === 'compact'
+    const showToolPayloads = toolCallMode === 'full'
+    const className = `lumina-chat-message lumina-chat-message-${message.role} ${toolIsCompact ? 'lumina-chat-message-tool-compact' : ''} ${message.status === 'error' ? 'lumina-chat-message-error' : ''}`.trim()
     const children: any[] = [
       React.createElement('span', { key: 'role', className: 'lumina-chat-role' }, chatRoleLabel(message)),
     ]
-    const kind = String(message.metadata?.kind || '')
     if (message.role !== 'tool' || kind !== 'tool_result') {
       children.push(React.createElement('p', { key: 'text' }, message.text))
     }
@@ -422,10 +524,10 @@ type ChatMessage = {
         React.createElement('span', null, toolName),
         toolCallId && React.createElement('code', null, toolCallId)
       ))
-      if (kind === 'tool_call' && metadata.arguments !== undefined && metadata.arguments !== '') {
+      if (kind === 'tool_call' && showToolPayloads && metadata.arguments !== undefined && metadata.arguments !== '') {
         children.push(React.createElement('pre', { key: 'tool-args', className: 'lumina-chat-tool-output' }, formatToolValue(metadata.arguments)))
       }
-      if (kind === 'tool_result') {
+      if (kind === 'tool_result' && showToolPayloads) {
         children.push(React.createElement('pre', { key: 'tool-result', className: 'lumina-chat-tool-output' }, message.text))
       }
     }
