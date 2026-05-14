@@ -203,7 +203,9 @@
 .lumina-chat-panel {
   display: flex;
   flex-direction: column;
-  min-height: min(78vh, 58rem);
+  height: min(78vh, 58rem);
+  min-height: 0;
+  max-height: min(78vh, 58rem);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-primary, #a78bfa) 30%, transparent);
   border-radius: 1.25rem;
@@ -238,11 +240,13 @@
 
 .lumina-chat-history {
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.75rem;
-  min-height: 16rem;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 1rem;
   border-block: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(2, 6, 23, 0.28);
@@ -288,6 +292,8 @@
   color: var(--color-foreground);
   font-size: 0.94rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lumina-chat-status {
@@ -363,7 +369,9 @@
   }
 
   .lumina-chat-panel {
-    min-height: 34rem;
+    height: 34rem;
+    min-height: 0;
+    max-height: 72vh;
   }
 
   .lumina-chat-form {
