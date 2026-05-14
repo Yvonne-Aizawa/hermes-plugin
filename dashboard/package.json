@@ -1,0 +1,18 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "latest",
+    "@pixiv/three-vrm-animation": "^3.5.2",
+    "three": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "@types/three": "^0.184.1",
+    "typescript": "latest",
+    "vite": "latest"
+  }
+}

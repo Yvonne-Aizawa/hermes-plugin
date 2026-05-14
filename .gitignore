@@ -1,0 +1,17 @@
+__pycache__
+node_modules/
+
+# Local/private avatar assets.
+# Keep code public; provide your own VRM/VRMA/FBX files locally.
+assets/**/*.vrm
+assets/**/*.vrma
+assets/**/*.fbx
+dashboard/assets/**/*.vrm
+dashboard/assets/**/*.vrma
+dashboard/assets/**/*.fbx
+
+# Keep placeholder/docs files trackable inside otherwise ignored asset dirs.
+!assets/**/.gitkeep
+!dashboard/assets/**/.gitkeep
+!assets/**/README.md
+!dashboard/assets/**/README.md

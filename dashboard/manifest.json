@@ -1,0 +1,15 @@
+{
+  "name": "lumina_plugin",
+  "label": "Lumina",
+  "description": "A small hello-world dashboard page for Lumina's custom Hermes plugin.",
+  "icon": "Sparkles",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/lumina",
+    "position": "after:skills"
+  },
+  "slots": [],
+  "entry": "dist/index.js",
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
+}
