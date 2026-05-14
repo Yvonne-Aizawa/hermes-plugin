@@ -1,12 +1,8 @@
 name: lumina_plugin
 version: 1.0.0
-description: "Lumina's general-purpose Hermes plugin. Bundles useful tools and helpers; currently provides HTTP/API request support, ntfy notifications, Transmute file conversion, and is designed to grow with more functions."
+description: "Lumina's embodied avatar/dashboard plugin for Hermes. Provides renderer-neutral avatar state and ordered timeline tools for the /lumina interface."
 author: lumina
 kind: backend
 provides_tools:
-  - http_request
-  - send_notification
-  - transmute_file_conversions
-  - transmute_convert_file
   - avatar_get_state
   - avatar_emit

@@ -1,6 +1,6 @@
 # Lumina Hermes Plugin
 
-Lumina is a user plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It bundles a small set of custom tools plus a dashboard tab that renders Lumina as a VRM avatar with renderer-neutral state and timeline events.
+Lumina is a user plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It provides a dashboard tab that renders Lumina as a VRM avatar with renderer-neutral state and timeline events.
 
 The current focus is the `/lumina` dashboard page: a browser-based Three.js/VRM avatar renderer that can be driven by Hermes tool calls today, and can grow into a dedicated embodied chat interface later.
 
@@ -13,13 +13,9 @@ The current focus is the `/lumina` dashboard page: a browser-based Three.js/VRM 
 - **Renderer-neutral avatar protocol**
   - state snapshot: mood, animation, expression, speaking, gesture, intensity
   - ordered timeline events: `speech.say`, `speech.pause`, `avatar.animation`, `avatar.expression`, `avatar.gaze`, `avatar.state`
-- **Hermes tools**
+- **Hermes avatar tools**
   - `avatar_get_state`
   - `avatar_emit`
-  - `http_request`
-  - `send_notification`
-  - `transmute_file_conversions`
-  - `transmute_convert_file`
 - **Shared state across processes**
   - avatar state/events are persisted under `~/.hermes/state/lumina_plugin/`
   - this lets Hermes tool sessions and the dashboard API process see the same state
@@ -130,13 +126,9 @@ Patches avatar state and/or queues timeline events:
 
 ## Environment variables
 
-Optional integrations read credentials from environment variables at runtime. Do not commit these values.
-
-- `NTFY_URL`
-- `NTFY_TOKEN`
-- `TRANSMUTE_URL`
-- `TRANSMUTE_API_KEY`
 - `LUMINA_AVATAR_STATE_DIR` — optional override for the file-backed avatar state directory, mostly useful for tests
+
+General-purpose HTTP, ntfy, and Transmute tools live in a separate `utility_tools` plugin.
 
 ## Public repo checklist
 
