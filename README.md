@@ -166,6 +166,25 @@ dashboard/assets/animations/vrma/dance.vrma
 
 The matching `assets/` directory can be used for source copies, but the dashboard serves files from `dashboard/assets/`.
 
+### Where to get assets
+
+- **VRM model:** Create your own avatar in [VRoid Studio](https://vroid.com/en/studio), then export it as a `.vrm` file and place it at `dashboard/assets/lumina.vrm`.
+- **VRMA animations:** This project expects the Amica animation filenames from [`semperai/amica/public/animations`](https://github.com/semperai/amica/tree/master/public/animations). Copy the needed `.vrma` files into `dashboard/assets/animations/vrma/`.
+
+The controller currently looks for these Amica-style filenames:
+
+```text
+idle_loop.vrma
+greeting.vrma
+peaceSign.vrma
+shoot.vrma
+spin.vrma
+modelPose.vrma
+squat.vrma
+showFullBody.vrma
+dance.vrma
+```
+
 The included placeholder README files explain the expected paths. Check the license metadata of your VRM and animation files before sharing them.
 
 ## Roadmap
