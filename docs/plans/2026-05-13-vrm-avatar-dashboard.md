@@ -791,9 +791,19 @@ Desktop layout:
 
 Responsive fallback: avatar on top, chat below. Future Quest/browser-XR layout can make the avatar full-screen and render chat as an overlay panel.
 
-### Implementation discovery needed
+### Implementation discovery result
 
-Before building the real Hermes-backed chat loop, inspect the Hermes gateway/platform code and API server adapter to choose the least invasive integration point. Prefer a plugin/local adapter if Hermes supports community messaging platforms cleanly. If the platform adapter path needs upstream Hermes changes, use a dashboard-only echo/stub endpoint only as a temporary UI spike, not as the final architecture.
+Hermes already supports plugin-registered gateway platforms via `PluginContext.register_platform(...)` and `gateway.platform_registry.PlatformEntry`. `GatewayRunner._create_adapter(...)` checks the plugin registry before built-in adapters, and `gateway.config.Platform` accepts plugin platform names dynamically. That means Lumina can become a real Hermes messaging surface without adding a new model provider and without calling OpenAI/provider APIs from the dashboard plugin.
+
+Chosen path for the real chat loop:
+
+- Add a `lumina_web` platform adapter inside this plugin.
+- Register it from `__init__.py` with `ctx.register_platform(name="lumina_web", ...)`.
+- Implement the adapter as a small local HTTP/SSE bridge running in the Hermes gateway process.
+- Keep the browser talking to dashboard-authenticated plugin routes; those routes proxy to the local `lumina_web` adapter instead of exposing an unauthenticated browser port.
+- Use the normal gateway `MessageEvent` + `SessionSource` path so Hermes sessions, memory, skills, tools, approvals, and final response delivery remain native.
+
+The existing API server adapter is useful reference material, especially `/v1/runs` and SSE events, but it should not be the primary Lumina transport because it presents as `api_server`, not as a dedicated Lumina messaging surface. A temporary dashboard stub remains acceptable for Task 9B UI work only.
 
 ---
 
@@ -801,29 +811,98 @@ Before building the real Hermes-backed chat loop, inspect the Hermes gateway/pla
 
 **Objective:** Find the correct Hermes-native way for `/lumina` to submit browser messages as a platform/channel, similar to Telegram or Mattermost, without calling a model/provider API directly.
 
-**Files:**
+**Files inspected:**
 
-- Inspect: `~/.hermes/hermes-agent/gateway/platforms/`
-- Inspect: `~/.hermes/hermes-agent/gateway/`
-- Inspect: API server / dashboard integration files in `~/.hermes/hermes-agent/`
-- Modify: this plan with the chosen integration point
-- Optional later: create `docs/lumina-web-chat-platform.md`
+- `~/.hermes/hermes-agent/gateway/platforms/base.py`
+  - `BasePlatformAdapter`
+  - `MessageEvent`
+  - `MessageType`
+  - `SendResult`
+- `~/.hermes/hermes-agent/gateway/session.py`
+  - `SessionSource`
+  - `SessionContext`
+- `~/.hermes/hermes-agent/gateway/platform_registry.py`
+  - `PlatformEntry`
+  - plugin platform registry
+- `~/.hermes/hermes-agent/hermes_cli/plugins.py`
+  - `PluginContext.register_platform(...)`
+- `~/.hermes/hermes-agent/gateway/run.py`
+  - `GatewayRunner._create_adapter(...)`
+  - `_handle_message_with_agent(...)` / message dispatch path
+- `~/.hermes/hermes-agent/gateway/platforms/api_server.py`
+  - `/v1/runs`, `/v1/runs/{run_id}/events`, session headers, SSE event shape
+- `~/.hermes/hermes-agent/hermes_cli/web_server.py`
+  - dashboard plugin API mounting under `/api/plugins/<name>/`
 
-**Steps:**
+**Chosen integration point:**
 
-1. Locate how Telegram/Mattermost platform adapters create incoming messages and delivery targets.
-2. Locate how the API server or webhook adapters inject messages into Hermes sessions.
-3. Identify whether a user plugin can register a messaging platform adapter, or whether this requires a small Hermes core change.
-4. Decide channel identity format, for example `lumina:dashboard:default`.
-5. Decide delivery path from Hermes back to the browser: polling, SSE, WebSocket, or an existing dashboard event bus.
-6. Record the chosen design in this plan before implementation.
+Implement `lumina_web` as a plugin-registered gateway platform adapter.
 
-**Acceptance criteria:**
+**New/modified plugin files:**
 
-- The plan names the exact Hermes files/classes/routes to reuse or extend.
-- The design preserves normal Hermes session/memory/tool behavior.
-- No model provider or OpenAI-compatible API call is introduced in `lumina_plugin`.
-- It is clear how assistant replies get back to the browser chat panel.
+- Create: `platform.py`
+  - define `LuminaWebAdapter(BasePlatformAdapter)`
+  - define `check_lumina_web_requirements() -> bool`
+  - local endpoints inside the gateway process:
+    - `GET /health`
+    - `POST /messages`
+    - `GET /events` or `GET /events/{channel_id}` as SSE or long-poll
+  - incoming messages create:
+    - `SessionSource(platform=Platform("lumina_web"), chat_id="dashboard:default", chat_type="dm", user_id="dashboard", user_name="Yvonne")`
+    - `MessageEvent(text=..., message_type=MessageType.TEXT, source=source, message_id=...)`
+  - call `self._message_handler(event)` so Hermes owns the run
+  - `send(chat_id, content, ...)` appends assistant output to a per-channel queue/store and mirrors `content` into `speech.say` avatar events
+- Modify: `__init__.py`
+  - keep avatar tools
+  - add `ctx.register_platform(name="lumina_web", label="Lumina Web", adapter_factory=lambda cfg: LuminaWebAdapter(cfg), check_fn=check_lumina_web_requirements, emoji="✨", pii_safe=True, platform_hint="Browser-local Lumina embodied chat")`
+- Modify: `plugin.yaml`
+  - advertise platform capability if the manifest supports it; otherwise rely on runtime registration
+- Modify: `dashboard/plugin_api.py`
+  - add authenticated proxy routes:
+    - `POST /chat/messages` -> local `lumina_web` adapter `POST /messages`
+    - `GET /chat/events` -> local `lumina_web` adapter events endpoint, or polling fallback
+    - `GET /chat/health` -> adapter health
+- Modify: `dashboard/src/api.ts`
+  - add chat send/events helpers using dashboard `SDK.fetchJSON(...)` / stream helper
+- Modify: `dashboard/src/main.ts`
+  - use chat helpers from the UI skeleton
+
+**Configuration shape:**
+
+Add/enable a gateway platform in Hermes config once implemented:
+
+```yaml
+platforms:
+  lumina_web:
+    enabled: true
+    extra:
+      host: 127.0.0.1
+      port: 8765
+      channel_id: dashboard:default
+```
+
+Keep browser traffic on dashboard routes; do not expose the Lumina adapter directly beyond loopback unless a proper auth layer is added.
+
+**Channel/session identity:**
+
+- Platform: `lumina_web`
+- Default chat/channel: `dashboard:default`
+- Stable memory/session key target: `lumina_web:dashboard:default`
+- Browser tab IDs may be used later for multi-window routing, but v1 should deliberately use one stable default channel so refreshes resume the same embodied conversation.
+
+**Delivery choice:**
+
+- v1: polling or SSE from dashboard plugin route to browser.
+- Preferred if easy: SSE, because API server already proves the event shape works for streaming/delta-style UX.
+- Fallback: short polling against a file-backed/queue-backed chat event store, matching the avatar timeline’s durable cross-process pattern.
+
+**Acceptance criteria update:**
+
+- `hermes platforms` / gateway startup can discover `lumina_web` as a plugin platform.
+- Sending a message through the adapter enters the normal gateway message handler, not a direct model call.
+- Assistant replies arrive through `LuminaWebAdapter.send(...)` and appear in browser chat.
+- The same reply text is emitted as `speech.say` for subtitles.
+- Dashboard routes are only an authenticated proxy/UI bridge; they are not the chat brain.
 
 **Commit:**
 
@@ -874,8 +953,10 @@ git add dashboard/src dashboard/dist dashboard/plugin_api.py
 
 **Files:**
 
-- Modify/create: files identified in Task 9A
-- Modify: `dashboard/plugin_api.py` if it remains the authenticated bridge
+- Modify/create: `platform.py` with `LuminaWebAdapter`
+- Modify: `__init__.py` to register `lumina_web` via `ctx.register_platform(...)`
+- Modify: `plugin.yaml` only if a platform capability field is supported by Hermes plugin manifests
+- Modify: `dashboard/plugin_api.py` as the authenticated browser-to-loopback adapter proxy
 - Modify: `dashboard/src/api.ts`
 - Modify: `dashboard/src/main.ts`
 - Modify: `dashboard/dist/`
@@ -1102,4 +1183,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8 are complete. The next product direction is the `/lumina` chatbox as a Hermes-native messaging surface. Start with **Task 9A: Investigate Hermes messaging platform adapter path**, then build **Task 9B: dashboard chatbox UI skeleton** once the integration point is clear. Do not call model/provider APIs directly from the dashboard plugin.
+Tasks 1–8 are complete, and Task 9A has identified the real integration path: implement `lumina_web` as a plugin-registered Hermes gateway platform adapter, with dashboard plugin routes acting only as an authenticated browser proxy. Next, build **Task 9B: dashboard chatbox UI skeleton** with a stub transport if needed, then implement **Task 9C: `LuminaWebAdapter` and real chat transport**. Do not call model/provider APIs directly from the dashboard plugin.
