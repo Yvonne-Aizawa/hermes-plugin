@@ -8,8 +8,8 @@
 - `dashboard/plugin_api.py` validates the request and writes a file-backed inbound message under `~/.hermes/state/lumina_plugin/chat/inbox/`.
 - The plugin registers a gateway platform named `lumina_web` from `platform.py` via `ctx.register_platform(...)`.
 - `LuminaWebAdapter` polls the inbox, converts records into normal Hermes `MessageEvent`s, and lets the gateway create/resume the stable Lumina session.
-- Assistant replies are sent back through `LuminaWebAdapter.send(...)`, which writes browser-visible outbox messages under `~/.hermes/state/lumina_plugin/chat/outbox/`.
-- The dashboard polls `GET /api/plugins/lumina_plugin/chat/messages?after=...` and appends the merged conversation history — browser/user messages plus assistant replies — to the chat panel. User messages are loaded from `inbox/`, `processing/`, and `processed/` so reloads preserve both sides of the conversation.
+- Assistant replies are sent back through `LuminaWebAdapter.send(...)`, which writes short-lived browser delivery messages under `~/.hermes/state/lumina_plugin/chat/outbox/`.
+- The dashboard polls `GET /api/plugins/lumina_plugin/chat/messages?after=...`; durable reload history comes from Hermes `SessionDB` for the stable `lumina_web` session, while only pending `inbox/` and `processing/` transport messages are overlaid for immediate send feedback. `processed/` and `outbox/` files are not durable UI history.
 - The same assistant reply text is mirrored into the avatar timeline as `speech.say` plus a light expression event.
 
 ## Stable channel identity

@@ -269,9 +269,6 @@ type ChatMessage = {
       sendLuminaChatMessage(sdk.fetchJSON, text)
         .then(function (response) {
           const bridgeMessage = response && response.message ? response.message : null
-          if (bridgeMessage && bridgeMessage.id) {
-            chatCursorRef.current = bridgeMessage.id
-          }
           setChatMessages((previous: ChatMessage[]) => previous.map((message) => message.id === userMessage.id ? {
             ...message,
             id: bridgeMessage && bridgeMessage.id ? bridgeMessage.id : message.id,
@@ -401,13 +398,23 @@ type ChatMessage = {
 
   function mergeChatMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
     if (incoming.length === 0) return existing
-    const seen = new Set(existing.map((message) => message.id))
     const merged = existing.slice()
     incoming.forEach((message) => {
-      if (!seen.has(message.id)) {
-        seen.add(message.id)
-        merged.push(message)
+      const exactIndex = merged.findIndex((existingMessage) => existingMessage.id === message.id)
+      if (exactIndex >= 0) {
+        merged[exactIndex] = { ...merged[exactIndex], ...message, status: message.status || merged[exactIndex].status }
+        return
       }
+      const canonicalIndex = merged.findIndex((existingMessage) => {
+        const existingIsTransport = existingMessage.id.startsWith('user-') || existingMessage.id.startsWith('lumina_in_') || existingMessage.id.startsWith('lumina_out_')
+        const incomingIsSession = message.id.startsWith('session_')
+        return existingIsTransport && incomingIsSession && existingMessage.role === message.role && existingMessage.text === message.text
+      })
+      if (canonicalIndex >= 0) {
+        merged[canonicalIndex] = { ...message, status: 'sent' }
+        return
+      }
+      merged.push(message)
     })
     return merged
   }

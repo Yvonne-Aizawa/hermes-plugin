@@ -40,7 +40,7 @@ else:
     try:  # Hermes runtime imports
         from gateway.config import Platform, PlatformConfig
         from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType, SendResult
-        from gateway.session import SessionSource
+        from gateway.session import SessionSource, build_session_key
     except ImportError:  # pragma: no cover - surfaced explicitly in check_fn
         Platform = None  # type: ignore[assignment]
         PlatformConfig = object  # type: ignore[assignment]
@@ -49,6 +49,7 @@ else:
         MessageType = None  # type: ignore[assignment]
         SendResult = None  # type: ignore[assignment]
         SessionSource = None  # type: ignore[assignment]
+        build_session_key = None  # type: ignore[assignment]
 
     try:
         from hermes_constants import get_hermes_home
@@ -145,7 +146,136 @@ else:
 
 
     def _sort_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return sorted(messages, key=lambda item: (str(item.get("created_at") or ""), str(item.get("id") or "")))
+        def sort_key(item: dict[str, Any]) -> tuple[float, str]:
+            created_at = item.get("created_at")
+            if isinstance(created_at, (int, float)):
+                ts = float(created_at)
+            else:
+                value = str(created_at or "")
+                try:
+                    ts = datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+                except (TypeError, ValueError):
+                    ts = 0.0
+            return (ts, str(item.get("id") or ""))
+
+        return sorted(messages, key=sort_key)
+
+
+    def _session_index_path() -> Path:
+        return Path(get_hermes_home()) / "sessions" / "sessions.json"
+
+
+    def _lumina_session_key() -> str:
+        if build_session_key is not None and SessionSource is not None and Platform is not None:
+            source = SessionSource(
+                platform=_lumina_platform(),
+                chat_id=LUMINA_CHAT_ID,
+                chat_name=LUMINA_CHAT_NAME,
+                chat_type="dm",
+                user_id=DEFAULT_USER_ID,
+                user_name=DEFAULT_USER_NAME,
+            )
+            return build_session_key(source)
+        return f"agent:main:{PLATFORM_NAME}:dm:{LUMINA_CHAT_ID}"
+
+
+    def get_lumina_session_id() -> str | None:
+        index = _safe_json_load(_session_index_path())
+        if not index:
+            return None
+        entry = index.get(_lumina_session_key())
+        if not isinstance(entry, dict):
+            return None
+        session_id = entry.get("session_id")
+        return str(session_id) if session_id else None
+
+
+    def _session_db():
+        try:
+            from hermes_state import SessionDB
+
+            return SessionDB(db_path=Path(get_hermes_home()) / "state.db")
+        except Exception:
+            return None
+
+
+    def _message_text(content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    value = item.get("text") or item.get("content")
+                    if value:
+                        parts.append(str(value))
+                elif item is not None:
+                    parts.append(str(item))
+            return "\n".join(parts).strip()
+        if content is None:
+            return ""
+        return str(content)
+
+
+    def _timestamp_to_iso(value: Any) -> str:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(float(value), timezone.utc).isoformat().replace("+00:00", "Z")
+        return str(value or "")
+
+
+    def _chat_message_from_db_row(row: dict[str, Any]) -> dict[str, Any] | None:
+        role = row.get("role")
+        if role not in {"user", "assistant", "system"}:
+            return None
+        text = _message_text(row.get("content")).strip()
+        if not text:
+            return None
+        row_id = row.get("id")
+        return {
+            "id": f"session_{row_id}",
+            "role": role,
+            "text": text,
+            "chat_id": LUMINA_CHAT_ID,
+            "created_at": _timestamp_to_iso(row.get("timestamp")),
+            "metadata": {"source": "session", "session_id": row.get("session_id")},
+        }
+
+
+    def get_session_chat_messages(after: str | None = None, *, limit: int = 100) -> list[dict[str, Any]]:
+        session_id = get_lumina_session_id()
+        if not session_id:
+            return []
+        db = _session_db()
+        if not db:
+            return []
+        try:
+            resolved_session_id = db.resolve_resume_session_id(session_id)
+            rows = db.get_messages(resolved_session_id)
+        except Exception:
+            return []
+        messages = [message for row in rows if (message := _chat_message_from_db_row(row))]
+        messages = _messages_after(messages, after)
+        return messages[: max(1, min(int(limit or 100), 500))]
+
+
+    def get_pending_transport_messages() -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
+        for subdir in ("processing", "inbox"):
+            messages.extend(_load_messages_from_subdir(subdir))
+        return _sort_chat_messages(messages)
+
+
+    def _dedupe_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        seen_ids: set[str] = set()
+        result: list[dict[str, Any]] = []
+        for message in messages:
+            message_id = str(message.get("id") or "")
+            if message_id and message_id in seen_ids:
+                continue
+            if message_id:
+                seen_ids.add(message_id)
+            result.append(message)
+        return result
 
 
     def _messages_after(messages: list[dict[str, Any]], after: str | None) -> list[dict[str, Any]]:
@@ -168,16 +298,14 @@ else:
     def get_chat_messages(after: str | None = None, *, limit: int = 100) -> list[dict[str, Any]]:
         """Return browser-visible user + assistant messages after an optional id.
 
-        User messages move from inbox -> processing -> processed as the gateway
-        drains them.  Include all three locations so a page reload can rebuild
-        the whole visible conversation instead of showing only assistant outbox
-        messages.
+        Durable conversation history comes from Hermes SessionDB. The local
+        plugin chat directory is transport state only; overlay currently pending
+        browser messages from inbox/processing so sends appear immediately.
         """
 
-        messages: list[dict[str, Any]] = []
-        for subdir in ("processed", "processing", "inbox", "outbox"):
-            messages.extend(_load_messages_from_subdir(subdir))
-        messages = _sort_chat_messages(messages)
+        messages = get_session_chat_messages(after=None, limit=limit)
+        messages.extend(get_pending_transport_messages())
+        messages = _dedupe_chat_messages(_sort_chat_messages(messages))
         messages = _messages_after(messages, after)
         return messages[: max(1, min(int(limit or 100), 500))]
 
