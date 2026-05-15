@@ -1,8 +1,8 @@
 # Lumina Hermes Plugin
 
-Lumina is a user plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It provides a dashboard tab that renders Lumina as a VRM avatar with renderer-neutral state and timeline events.
+Lumina is a user plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It provides `/lumina`, an embodied browser chat surface with a VRM avatar renderer, renderer-neutral state, and ordered timeline events.
 
-The current focus is the `/lumina` dashboard page: a browser-based Three.js/VRM avatar renderer that can be driven by Hermes tool calls today, and can grow into a dedicated embodied chat interface later.
+The current focus is keeping `/lumina` as the primary embodied Lumina interface while normal Hermes surfaces such as Telegram, Mattermost, and CLI stay general-purpose by default.
 
 ## Features
 
@@ -16,6 +16,10 @@ The current focus is the `/lumina` dashboard page: a browser-based Three.js/VRM 
 - **Hermes avatar tools**
   - `avatar_get_state`
   - `avatar_emit`
+- **Hermes-native Lumina chat surface**
+  - browser messages enter Hermes through the `lumina_web` gateway platform
+  - visible history is backed by Hermes `SessionDB`, not stale plugin queue files
+  - assistant replies are mirrored into the avatar timeline as `speech.say` events
 - **Shared state across processes**
   - avatar state/events are persisted under `~/.hermes/state/lumina_plugin/`
   - this lets Hermes tool sessions and the dashboard API process see the same state
@@ -36,7 +40,7 @@ The current focus is the `/lumina` dashboard page: a browser-based Three.js/VRM 
 │   ├── src/                       # TypeScript dashboard source
 │   ├── dist/                      # built dashboard bundle
 │   └── assets/                    # dashboard-served model/animation assets
-└── docs/plans/                    # implementation plans and design notes
+└── docs/                          # operator docs, chat notes, plans
 ```
 
 ## Installation
@@ -92,6 +96,8 @@ The same payloads are intended to be renderer-neutral so a future Quest/XR rende
 
 ## Avatar tools
 
+Avatar tools are intentionally compact and primarily support the `/lumina` embodied surface. They may remain enabled in general Hermes sessions for development/debugging, but ordinary Telegram/Mattermost/CLI chats should not assume the user is watching the avatar unless they explicitly ask for avatar control.
+
 ### `avatar_get_state`
 
 Returns current avatar state and protocol metadata. Optionally includes queued events:
@@ -129,6 +135,18 @@ Patches avatar state and/or queues timeline events:
 - `LUMINA_AVATAR_STATE_DIR` — optional override for the file-backed avatar state directory, mostly useful for tests
 
 General-purpose HTTP, ntfy, and Transmute tools live in a separate `utility_tools` plugin.
+
+## Embodied surface scope
+
+`/lumina` is the primary place for avatar-specific interaction: companion-style chat, subtitles, expressions, gestures, VRMA animations, and future XR renderer alignment. Other Hermes platforms should remain broadly useful and avoid carrying heavy avatar-specific behavior by default.
+
+The plugin currently scopes this by:
+
+- registering `lumina_web` as a Hermes gateway platform with a Lumina-specific platform hint;
+- keeping dashboard rendering and avatar protocol docs under the Lumina plugin;
+- leaving `avatar_get_state` and `avatar_emit` available under the `lumina_plugin` toolset for debugging/development.
+
+See `docs/avatar-dashboard.md` for the current operator workflow and boundary decisions.
 
 ## Public repo checklist
 
@@ -181,7 +199,6 @@ The included placeholder README files explain the expected paths. Check the lice
 
 ## Roadmap
 
-- Add a dedicated `/lumina` chatbox so the page becomes the primary embodied Lumina interface.
-- Keep normal Hermes sessions general-purpose while moving avatar-specific context/tools toward the Lumina page.
+- Keep normal Hermes sessions general-purpose while `/lumina` becomes the primary embodied Lumina interface.
 - Add subtle liveliness: blinking, breathing, speaking placeholder, and softer idle behavior.
 - Document a Quest/XR renderer bridge that consumes the same avatar protocol.

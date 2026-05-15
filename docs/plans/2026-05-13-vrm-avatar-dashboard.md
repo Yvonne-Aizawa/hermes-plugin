@@ -953,7 +953,7 @@ git add dashboard/src dashboard/dist dashboard/plugin_api.py
 
 **Objective:** Replace the stub transport with a real Hermes message pipeline integration so `/lumina` behaves like a browser messaging platform.
 
-**Status:** Implemented MVP polling/file-queue bridge. `lumina_web` is registered as a plugin platform adapter, the dashboard chat panel queues browser messages through plugin API routes, assistant replies are polled back from the adapter outbox, and reply text is mirrored into the avatar timeline as `speech.say`. Gateway config still needs `platforms.lumina_web.enabled=true` and a gateway/dashboard restart to activate the adapter in a live process.
+**Status:** Completed as the MVP polling/file-queue bridge. `lumina_web` is registered as a plugin platform adapter, the dashboard chat panel queues browser messages through plugin API routes, assistant replies are polled back from the adapter outbox, and reply text is mirrored into the avatar timeline as `speech.say`. The active local Hermes profile has `platforms.lumina_web.enabled=true`; other installs still need that config plus a gateway/dashboard restart to activate the adapter in a live process.
 
 **Files:**
 
@@ -991,14 +991,16 @@ git add <changed Hermes/lumina files> docs/lumina-web-chat-platform.md
 
 ---
 
-## Task 9D: Scope avatar behavior to Lumina surface
+## Task 9D: Scope avatar behavior to Lumina surface 🚧
+
+**Status:** Started. The plugin already registers `lumina_web` with a Lumina-specific platform hint, so embodied companion guidance is scoped to the `/lumina` browser surface instead of being imposed on every Hermes platform. This pass updates the plan and docs to make that boundary explicit while keeping `avatar_get_state` and `avatar_emit` available under the `lumina_plugin` toolset for debugging/development.
 
 **Objective:** Reduce pressure on general-purpose Hermes sessions by making `/lumina` the primary embodied chat context while keeping global avatar tools available for debugging.
 
 **Files:**
 
 - Modify: `README.md`
-- Modify: `docs/avatar-dashboard.md` once it exists
+- Create/modify: `docs/avatar-dashboard.md`
 - Modify: this plan
 - Optional: Hermes profile/toolset config notes
 
@@ -1010,15 +1012,16 @@ git add <changed Hermes/lumina files> docs/lumina-web-chat-platform.md
 
 **Acceptance criteria:**
 
-- Docs explain where avatar-specific interaction should happen.
-- General Hermes sessions remain clean and broadly useful.
-- The Lumina page can still drive the avatar without requiring every session to carry the full avatar context.
+- [x] Docs explain where avatar-specific interaction should happen.
+- [x] General Hermes sessions remain clean and broadly useful by convention: only `lumina_web` receives the embodied platform hint.
+- [x] The Lumina page can still drive the avatar without requiring every session to carry the full avatar context.
+- [ ] Decide later whether `avatar_get_state`/`avatar_emit` should remain globally available for debugging or move behind Lumina-specific toolset policy.
 
 **Commit:**
 
 ```bash
-git add README.md docs/plans/2026-05-13-vrm-avatar-dashboard.md docs/avatar-dashboard.md
- git commit -m "docs: scope embodied chat behavior to Lumina surface"
+git add README.md docs/avatar-dashboard.md docs/plans/2026-05-13-vrm-avatar-dashboard.md
+git commit -m "docs: scope embodied chat behavior to Lumina surface"
 ```
 
 ---
@@ -1187,4 +1190,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8, Task 9A, and Task 9B are complete. The visible `/lumina` split layout now exists with a local chat stub. Next, implement **Task 9C: `LuminaWebAdapter` and real chat transport** so browser messages enter the normal Hermes gateway/session pipeline. Do not call model/provider APIs directly from the dashboard plugin.
+Tasks 1–8 and Tasks 9A–9C are complete. Task 9D is now underway: the docs and plan explicitly scope embodied/avatar behavior to `/lumina` while normal Hermes surfaces stay general-purpose and the compact avatar tools remain available for development/debugging. Next, finish the 9D boundary decision by observing whether global `avatar_get_state`/`avatar_emit` exposure is noisy; if it is, move them behind Lumina-specific toolset policy. After that, continue with **Task 10: renderer-agnostic event transport notes for Meta Quest**.
