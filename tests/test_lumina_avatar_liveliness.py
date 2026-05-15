@@ -34,6 +34,17 @@ def test_speech_timeline_drives_viewer_speaking_placeholder():
     assert 'viewerRef.current?.applyState({ speaking: false })' in source
 
 
+
+def test_one_shot_animations_return_to_idle_and_persist_idle_state():
+    viewer_source = VIEWER_TS.read_text(encoding='utf-8')
+    main_source = MAIN_TS.read_text(encoding='utf-8')
+
+    assert 'onOneShotAnimationFinished' in viewer_source
+    assert "playAvatarAnimation('idle', true, true)" in viewer_source
+    assert 'onTransientAnimationFinished' in main_source
+    assert "emitAvatar(sdk.fetchJSON, { state: { animation: 'idle' } })" in main_source
+
+
 def test_plan_marks_task_11_complete_after_liveliness_work():
     source = PLAN_MD.read_text(encoding='utf-8')
 

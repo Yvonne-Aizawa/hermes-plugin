@@ -52,9 +52,14 @@ export function createAvatarViewerStatus(): AvatarViewerStatus {
   }
 }
 
+export type AvatarViewerOptions = {
+  onOneShotAnimationFinished?: (name: string) => void
+}
+
 export function mountAvatarCanvas(
   container: HTMLElement,
-  onStatusChange?: (status: AvatarViewerStatus) => void
+  onStatusChange?: (status: AvatarViewerStatus) => void,
+  options: AvatarViewerOptions = {}
 ): AvatarViewerHandle {
   const status = createAvatarViewerStatus()
   function publish(patch: Partial<AvatarViewerStatus>) {
@@ -176,12 +181,20 @@ export function mountAvatarCanvas(
     const preset = resolvePreset(name)
     if (!preset) return
     if (!force && currentAnimation === name) return
-    const started = animationController?.play(name, { loop })
+    const shouldLoop = loop ?? preset.loop
+    const onFinished = shouldLoop || name === 'idle'
+      ? undefined
+      : () => {
+          currentAnimation = 'idle'
+          playAvatarAnimation('idle', true, true)
+          options.onOneShotAnimationFinished?.(name)
+        }
+    const started = animationController?.play(name, { loop: shouldLoop, onFinished })
     if (started) {
       currentAnimation = name
     } else {
       void animationController?.loadAll().then(() => {
-        if (animationController?.play(name, { loop })) {
+        if (animationController?.play(name, { loop: shouldLoop, onFinished })) {
           currentAnimation = name
         }
       })

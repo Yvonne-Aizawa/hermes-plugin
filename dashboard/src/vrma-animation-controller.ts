@@ -41,7 +41,7 @@ export const VRMA_PRESETS: Record<string, VrmaPreset> = {
 
 export type VrmaAnimationController = {
   loadAll: () => Promise<void>
-  play: (name: LuminaAnimationName, options?: { loop?: boolean }) => boolean
+  play: (name: LuminaAnimationName, options?: { loop?: boolean; onFinished?: () => void }) => boolean
   stop: () => void
   update: (delta: number) => void
   dispose: () => void
@@ -54,7 +54,16 @@ export function createVrmaAnimationController(vrm: VRM): VrmaAnimationController
   const clipsByUrl = new Map<string, AnimationClip>()
   const failed = new Set<string>()
   let activeAction: ReturnType<AnimationMixer['clipAction']> | null = null
+  let activeOnFinished: (() => void) | null = null
   let loadPromise: Promise<void> | null = null
+
+  mixer.addEventListener('finished', (event: any) => {
+    if (!activeAction || event.action !== activeAction) return
+    const onFinished = activeOnFinished
+    activeAction = null
+    activeOnFinished = null
+    onFinished?.()
+  })
 
   async function loadPreset(presetInfo: VrmaPreset): Promise<void> {
     if (clips.has(presetInfo.key) || failed.has(presetInfo.key)) return
@@ -94,6 +103,7 @@ export function createVrmaAnimationController(vrm: VRM): VrmaAnimationController
       if (activeAction) {
         activeAction.fadeOut(0.15)
       }
+      activeOnFinished = null
       const action = mixer.clipAction(clip)
       action.reset()
       action.clampWhenFinished = true
@@ -102,12 +112,14 @@ export function createVrmaAnimationController(vrm: VRM): VrmaAnimationController
       action.fadeIn(0.15)
       action.play()
       activeAction = action
+      activeOnFinished = shouldLoop ? null : options.onFinished || null
       return true
     },
     stop() {
       if (activeAction) {
         activeAction.fadeOut(0.15)
         activeAction = null
+        activeOnFinished = null
       }
     },
     update(delta: number) {
@@ -119,6 +131,8 @@ export function createVrmaAnimationController(vrm: VRM): VrmaAnimationController
       clips.clear()
       clipsByUrl.clear()
       failed.clear()
+      activeAction = null
+      activeOnFinished = null
     },
     loadedNames() {
       return Array.from(clips.keys()).sort()

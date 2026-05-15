@@ -1,5 +1,5 @@
 import { createAvatarViewerStatus, describeViewer, mountAvatarCanvas, type AvatarViewerHandle, type AvatarViewerStatus } from './avatar-viewer'
-import { fetchAvatarEvents, fetchAvatarProtocol, fetchAvatarState, fetchLuminaChatMessages, sendLuminaChatMessage, summarizeAvatarState, type AvatarState, type AvatarTimelineEvent, type LuminaChatMessage } from './api'
+import { emitAvatar, fetchAvatarEvents, fetchAvatarProtocol, fetchAvatarState, fetchLuminaChatMessages, sendLuminaChatMessage, summarizeAvatarState, type AvatarState, type AvatarTimelineEvent, type LuminaChatMessage } from './api'
 import { createTimelinePlayer, type TimelinePlayer } from './timeline-player'
 
 type HermesPluginSDK = {
@@ -144,7 +144,14 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
       const host = canvasHostRef.current as HTMLElement | null
       if (!host) return undefined
 
-      const viewer = mountAvatarCanvas(host, setViewerStatus)
+      function onTransientAnimationFinished(name: string) {
+        setCurrentAnimation('idle')
+        setAvatarState((previous: AvatarState | null) => previous ? { ...previous, animation: 'idle' } : previous)
+        emitAvatar(sdk.fetchJSON, { state: { animation: 'idle' } })
+          .catch((err: unknown) => console.warn(`Lumina could not persist idle after ${name} animation`, err))
+      }
+
+      const viewer = mountAvatarCanvas(host, setViewerStatus, { onOneShotAnimationFinished: onTransientAnimationFinished })
       viewerRef.current = viewer
       setViewerStatus({ ...viewer.status })
 
@@ -193,7 +200,9 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
           setLastEvent(`avatar.state #${event.id}`)
         },
         onEvent(event: AvatarTimelineEvent) {
-          if (event.type !== 'avatar.state') viewerRef.current?.applyEvent(event)
+          if (!['speech.say', 'speech.pause', 'avatar.animation', 'avatar.expression', 'avatar.gaze', 'avatar.state'].includes(event.type)) {
+            viewerRef.current?.applyEvent(event)
+          }
         },
       })
       timelineRef.current = player
