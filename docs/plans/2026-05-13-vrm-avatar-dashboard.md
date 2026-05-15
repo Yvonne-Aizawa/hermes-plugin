@@ -991,9 +991,9 @@ git add <changed Hermes/lumina files> docs/lumina-web-chat-platform.md
 
 ---
 
-## Task 9D: Scope avatar behavior to Lumina surface 🚧
+## Task 9D: Scope avatar behavior to Lumina surface ✅
 
-**Status:** Started. The plugin already registers `lumina_web` with a Lumina-specific platform hint, so embodied companion guidance is scoped to the `/lumina` browser surface instead of being imposed on every Hermes platform. This pass updates the plan and docs to make that boundary explicit while keeping `avatar_get_state` and `avatar_emit` available under the `lumina_plugin` toolset for debugging/development.
+**Status:** Completed for the current milestone. The plugin registers `lumina_web` with a Lumina-specific platform hint, so embodied companion guidance is scoped to the `/lumina` browser surface instead of being imposed on every Hermes platform. `avatar_get_state` and `avatar_emit` intentionally remain available under the `lumina_plugin` toolset for debugging/development now, with a documented future direction to scope them to the web interface once the Lumina surface has a dedicated tool policy.
 
 **Objective:** Reduce pressure on general-purpose Hermes sessions by making `/lumina` the primary embodied chat context while keeping global avatar tools available for debugging.
 
@@ -1008,14 +1008,15 @@ git add <changed Hermes/lumina files> docs/lumina-web-chat-platform.md
 
 - `/lumina` sessions receive embodied/persona/avatar-choreography guidance.
 - Normal Telegram/Mattermost/general sessions do not need heavy avatar-specific prompting by default.
-- `avatar_get_state` and `avatar_emit` remain available for development/debugging unless a future toolset policy moves them behind the Lumina surface.
+- `avatar_get_state` and `avatar_emit` remain available for development/debugging now.
+- Later, scope those avatar tools to the Lumina web interface/tool policy once the web surface can own avatar control cleanly.
 
 **Acceptance criteria:**
 
 - [x] Docs explain where avatar-specific interaction should happen.
 - [x] General Hermes sessions remain clean and broadly useful by convention: only `lumina_web` receives the embodied platform hint.
 - [x] The Lumina page can still drive the avatar without requiring every session to carry the full avatar context.
-- [ ] Decide later whether `avatar_get_state`/`avatar_emit` should remain globally available for debugging or move behind Lumina-specific toolset policy.
+- [x] Boundary decision recorded: keep `avatar_get_state`/`avatar_emit` globally available for debugging now, but later scope them to the Lumina web interface/tool policy.
 
 **Commit:**
 
@@ -1190,4 +1191,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8 and Tasks 9A–9C are complete. Task 9D is now underway: the docs and plan explicitly scope embodied/avatar behavior to `/lumina` while normal Hermes surfaces stay general-purpose and the compact avatar tools remain available for development/debugging. Next, finish the 9D boundary decision by observing whether global `avatar_get_state`/`avatar_emit` exposure is noisy; if it is, move them behind Lumina-specific toolset policy. After that, continue with **Task 10: renderer-agnostic event transport notes for Meta Quest**.
+Tasks 1–8 and Tasks 9A–9D are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. Next, continue with **Task 10: renderer-agnostic event transport notes for Meta Quest**.

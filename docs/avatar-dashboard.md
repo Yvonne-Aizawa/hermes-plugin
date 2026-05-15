@@ -95,7 +95,7 @@ After changing tool schemas or tool registration, start a fresh Hermes session s
 For now, avatar behavior is **scoped by convention and platform hint** rather than hard-isolated:
 
 - `/lumina` gets the embodied platform hint from `ctx.register_platform(..., platform_hint=...)`.
-- Avatar tools remain available under the `lumina_plugin` toolset for debugging and development.
+- Avatar tools remain available under the `lumina_plugin` toolset for debugging and development now.
 - General Telegram/Mattermost conversations should not assume the user is looking at the avatar unless they explicitly ask for avatar control.
 
-A stricter future version can move avatar tools behind Lumina-specific toolset policy if global tool exposure becomes noisy.
+Later, once the Lumina web surface has a dedicated tool policy, scope `avatar_get_state` and `avatar_emit` to the web interface so avatar control primarily happens from `/lumina` rather than every general-purpose Hermes surface.

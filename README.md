@@ -144,7 +144,7 @@ The plugin currently scopes this by:
 
 - registering `lumina_web` as a Hermes gateway platform with a Lumina-specific platform hint;
 - keeping dashboard rendering and avatar protocol docs under the Lumina plugin;
-- leaving `avatar_get_state` and `avatar_emit` available under the `lumina_plugin` toolset for debugging/development.
+- leaving `avatar_get_state` and `avatar_emit` available under the `lumina_plugin` toolset for debugging/development now, with a later goal of scoping them to the Lumina web interface/tool policy.
 
 See `docs/avatar-dashboard.md` for the current operator workflow and boundary decisions.
 
