@@ -15,6 +15,7 @@ import {
 } from 'three'
 import { VRMLoaderPlugin, type VRM } from '@pixiv/three-vrm'
 import { loadLuminaVrm } from './vrm-loader'
+import { createLivelinessController } from './liveliness-controller'
 import { createVrmaAnimationController, resolvePreset, type VrmaAnimationController } from './vrma-animation-controller'
 import type { AvatarState, AvatarTimelineEvent } from './api'
 
@@ -107,6 +108,7 @@ export function mountAvatarCanvas(
   let animationController: VrmaAnimationController | null = null
   let currentExpression = 'neutral'
   let currentAnimation = ''
+  const liveliness = createLivelinessController()
 
   function resize() {
     const width = Math.max(container.clientWidth, 1)
@@ -123,6 +125,7 @@ export function mountAvatarCanvas(
 
     if (currentVrm) {
       animationController?.update(delta)
+      liveliness.update(currentVrm, elapsed, delta)
       currentVrm.update(delta)
     } else {
       placeholder.core.position.y = 1.25 + Math.sin(elapsed * 1.4) * 0.035
@@ -188,6 +191,7 @@ export function mountAvatarCanvas(
   return {
     status,
     applyState: function applyState(state: Partial<AvatarState>) {
+      liveliness.applyState(state)
       if (state.expression) {
         setVrmExpression(currentVrm, state.expression, typeof state.intensity === 'number' ? state.intensity : undefined)
         currentExpression = state.expression
@@ -197,11 +201,15 @@ export function mountAvatarCanvas(
       }
     },
     applyEvent: function applyEvent(event: AvatarTimelineEvent) {
+      if (event.type === 'speech.say') {
+        liveliness.noteSpeech(event.text)
+      }
       if (event.type === 'avatar.expression' && event.name) {
         setVrmExpression(currentVrm, event.name, event.intensity)
         currentExpression = event.name
       }
       if (event.type === 'avatar.state' && event.state) {
+        liveliness.applyState(event.state)
         if (event.state.expression && event.state.expression !== currentExpression) {
           setVrmExpression(currentVrm, event.state.expression, event.state.intensity)
           currentExpression = event.state.expression

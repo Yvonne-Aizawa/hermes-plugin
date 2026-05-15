@@ -160,8 +160,10 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
           const text = event.text || ''
           setSubtitle(text)
           setLastEvent(`speech.say #${event.id}`)
+          viewerRef.current?.applyState({ speaking: true })
           setAvatarState((previous: AvatarState | null) => previous ? { ...previous, speaking: true } : previous)
           window.setTimeout(() => {
+            viewerRef.current?.applyState({ speaking: false })
             setAvatarState((previous: AvatarState | null) => previous ? { ...previous, speaking: false } : previous)
           }, Math.max(1400, Math.min(6000, text.length * 58)))
         },

@@ -1075,14 +1075,16 @@ git commit -m "docs: describe Lumina XR avatar event bridge"
 
 ---
 
-## Task 11: Improve liveliness without overbuilding
+## Task 11: Improve liveliness without overbuilding ✅
 
-**Objective:** Add small low-risk behaviors that make the avatar feel alive.
+**Status:** Completed. The dashboard viewer now has basic procedural liveliness: automatic blinking, tiny breathing motion, subtle head sway toward the camera, a faint neutral idle expression, and a speaking mouth-open placeholder driven by `speaking=true` / `speech.say` events. This intentionally avoids phoneme lip sync, tracking, IK, XR runtime work, or a complex emotion model.
 
 **Files:**
 
 - Modify: `dashboard/src/avatar-viewer.ts`
-- Modify: `dashboard/src/animation-controller.ts`
+- Create: `dashboard/src/liveliness-controller.ts`
+- Modify: `dashboard/src/main.ts`
+- Modify: `dashboard/dist/index.js`
 
 **Candidate behaviors:**
 
@@ -1104,8 +1106,11 @@ Those belong after the state/control loop works.
 
 **Verification:**
 
-- Avatar idles naturally for 2 minutes without animation glitches.
-- CPU/GPU usage remains reasonable in browser devtools.
+- [x] Added regression/static tests for the liveliness controller wiring.
+- [x] Frontend TypeScript typecheck passes.
+- [x] Dashboard bundle builds successfully.
+- [x] Plugin Python tests pass.
+- Manual/browser checks should still watch the avatar idle for ~2 minutes and confirm CPU/GPU usage remains reasonable in browser devtools.
 
 **Commit:**
 
@@ -1194,4 +1199,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8, Tasks 9A–9D, and Task 10 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Next, continue with **Task 11: improve liveliness without overbuilding**.
+Tasks 1–8, Tasks 9A–9D, Task 10, and Task 11 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Next, continue with **Task 12: document operator workflow**.
