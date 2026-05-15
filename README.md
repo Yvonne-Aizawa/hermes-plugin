@@ -199,6 +199,7 @@ The included placeholder README files explain the expected paths. Check the lice
 
 ## Roadmap
 
-- Keep normal Hermes sessions general-purpose while `/lumina` becomes the primary embodied Lumina interface.
-- Add subtle liveliness: blinking, breathing, speaking placeholder, and softer idle behavior.
-- Document a Quest/XR renderer bridge that consumes the same avatar protocol.
+- Keep normal Hermes sessions general-purpose while `/lumina` remains the primary embodied Lumina interface.
+- Subtle liveliness is implemented: blinking, breathing, speaking placeholder, and softer idle behavior. This covers subtle liveliness without overbuilding.
+- Quest/XR renderer bridge guardrails are documented so future renderers can consume the same avatar protocol.
+- Continue with future polish around streaming/push transport, richer expression mapping, and eventually scoping avatar tools to the Lumina web policy.

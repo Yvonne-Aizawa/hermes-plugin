@@ -1121,14 +1121,18 @@ git add dashboard/src dashboard/dist
 
 ---
 
-## Task 12: Document operator workflow
+## Task 12: Document operator workflow ✅
+
+**Status:** Completed. `docs/avatar-dashboard.md` now includes the clone/open operator workflow: local asset paths, frontend install/build, dashboard and gateway restart commands, API routes, Hermes tools, state vs timeline contract, renderer responsibility split, animation constraints, and known limitations.
 
 **Objective:** Make future work obvious.
 
 **Files:**
 
-- Create: `docs/avatar-dashboard.md`
+- Modify: `docs/avatar-dashboard.md`
+- Modify: `README.md`
 - Modify: this plan if lessons change
+- Create: `tests/test_lumina_operator_docs.py`
 
 **Include:**
 
@@ -1144,13 +1148,16 @@ git add dashboard/src dashboard/dist
 
 **Verification:**
 
-Someone should be able to clone/open the plugin and follow the doc without asking where the VRM file goes.
+- [x] Someone should be able to clone/open the plugin and follow the doc without asking where the VRM file goes.
+- [x] Regression/static doc tests cover the required operator workflow sections.
+- [x] Plugin Python tests pass.
+- [x] Dashboard TypeScript typecheck and production build pass.
 
 **Commit:**
 
 ```bash
-git add docs/avatar-dashboard.md docs/plans/2026-05-13-vrm-avatar-dashboard.md
- git commit -m "docs: document Lumina avatar dashboard workflow"
+git add README.md docs/avatar-dashboard.md docs/plans/2026-05-13-vrm-avatar-dashboard.md tests/test_lumina_operator_docs.py
+git commit -m "docs: document Lumina avatar dashboard workflow"
 ```
 
 ---
@@ -1199,4 +1206,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8, Tasks 9A–9D, Task 10, and Task 11 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Next, continue with **Task 12: document operator workflow**.
+Tasks 1–8 and Tasks 9A–12 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Task 12 is complete: operators can now find asset paths, build/restart commands, routes, tools, state/timeline behavior, renderer boundaries, and limitations in `docs/avatar-dashboard.md`.

@@ -87,7 +87,46 @@ If the Hermes session is deleted, `/lumina` should reload without resurrecting s
 
 ## Operator workflow
 
-After changing plugin Python, platform registration, dashboard routes, or config:
+This is the quick path for a fresh clone or a future maintenance pass.
+
+### 1. Place local avatar assets
+
+Avatar binaries are intentionally not committed. Put the operator-supplied files in the dashboard-served asset tree:
+
+```text
+dashboard/assets/lumina.vrm
+dashboard/assets/animations/vrma/
+```
+
+Expected VRMA filenames currently follow the Amica-style semantic mapping used by the renderer:
+
+```text
+idle_loop.vrma
+greeting.vrma
+peaceSign.vrma
+shoot.vrma
+spin.vrma
+modelPose.vrma
+squat.vrma
+showFullBody.vrma
+dance.vrma
+```
+
+Check model and animation licenses before sharing or publishing the repository.
+
+### 2. Install and build the frontend
+
+```bash
+cd ~/.hermes/plugins/lumina_plugin/dashboard
+npm install
+npm run build
+```
+
+`dashboard/dist/` is committed because Hermes serves the compiled bundle from the plugin directory. Rebuild after changing TypeScript, CSS, renderer wiring, or static dashboard assets.
+
+### 3. Restart runtime surfaces after backend/config changes
+
+After changing plugin Python, platform registration, dashboard API routes, or Hermes config:
 
 ```bash
 hermes dashboard --stop
@@ -95,14 +134,58 @@ hermes dashboard --host 0.0.0.0 --insecure --no-open
 systemctl --user restart hermes-gateway.service
 ```
 
-After changing frontend code:
+After changing tool schemas or tool registration, also start a fresh Hermes session so tool availability is resampled. A gateway/dashboard restart does not retroactively change the tool snapshot of an already-running conversation.
 
-```bash
-cd ~/.hermes/plugins/lumina_plugin/dashboard
-npm run build
+### 4. Verify routes and behavior
+
+Core dashboard/plugin routes:
+
+```text
+GET  /api/plugins/lumina_plugin/avatar/state
+POST /api/plugins/lumina_plugin/avatar/emit
+GET  /api/plugins/lumina_plugin/avatar/events?cursor=<event_id>
+GET  /api/plugins/lumina_plugin/avatar/protocol
+POST /api/plugins/lumina_plugin/chat/messages
+GET  /api/plugins/lumina_plugin/chat/messages?after=<message_id>&limit=100
 ```
 
-After changing tool schemas or tool registration, start a fresh Hermes session so tool availability is resampled.
+Available Hermes tools:
+
+```text
+avatar_get_state
+avatar_emit
+```
+
+A practical smoke test is:
+
+1. open `/lumina` in the dashboard;
+2. confirm the chat panel and avatar canvas load;
+3. send a short browser chat message;
+4. confirm the assistant reply appears in the chat panel;
+5. emit a small `speech.say` or `avatar.animation` event with `avatar_emit`;
+6. confirm the subtitle/animation appears without breaking the normal Telegram/Mattermost surfaces.
+
+### 5. State vs timeline contract
+
+In short, the state vs timeline split is:
+
+- **State snapshot:** durable-ish current posture/mood values such as `mood`, `animation`, `expression`, `speaking`, `gesture`, and `intensity`. Stored at `~/.hermes/state/lumina_plugin/avatar_state.json` unless `LUMINA_AVATAR_STATE_DIR` overrides it.
+- **Timeline events:** short-lived ordered renderer instructions such as `speech.say`, `speech.pause`, `avatar.animation`, `avatar.expression`, `avatar.gaze`, and `avatar.state`. Stored at `~/.hermes/state/lumina_plugin/avatar_events.json`; events expire by TTL and are not durable history.
+- **Chat history:** visible conversation history comes from Hermes `SessionDB`; plugin queue files under `~/.hermes/state/lumina_plugin/chat/` are transport/debug state only.
+
+### 6. Renderer responsibilities
+
+- **Hermes/plugin:** owns the renderer-neutral state, event validation, tool surface, Lumina web platform adapter, and file-backed transport state.
+- **dashboard renderer:** current browser UI; loads local VRM/VRMA assets, renders chat/subtitles, plays timeline events, and adds lightweight liveliness.
+- **future Quest renderer:** should consume the same state/events through a bridge, provide headset/controller/gaze input as normalized Hermes channel context, and avoid calling internal Hermes tools directly.
+
+### Known limitations
+
+- VRM and VRMA assets are local/operator-supplied and ignored by git.
+- Liveliness is intentionally procedural and light: blinking, breathing, small head motion, and placeholder mouth movement, not full face tracking or lip sync.
+- Dashboard v1 uses polling; WebSocket/WebRTC are future transport options for XR/realtime needs.
+- `avatar_get_state` and `avatar_emit` remain globally available for debugging while the plugin toolset is enabled; later work may scope them to the Lumina web policy.
+- Queue files are not durable chat history; rely on Hermes sessions for the visible conversation transcript.
 
 ## Current boundary decision
 
