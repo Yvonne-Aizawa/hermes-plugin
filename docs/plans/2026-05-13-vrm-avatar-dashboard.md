@@ -1027,15 +1027,17 @@ git commit -m "docs: scope embodied chat behavior to Lumina surface"
 
 ---
 
-## Task 10: Add renderer-agnostic event transport notes for Meta Quest
+## Task 10: Add renderer-agnostic event transport notes for Meta Quest ✅
+
+**Status:** Completed as a documentation/architecture guardrail only. This does not implement the Quest app. It records how a future Quest renderer should consume the same state/protocol/events as the dashboard while keeping Hermes/plugin as the brain and avoiding renderer-specific leakage into `avatar_state.py` or `avatar_timeline.py`.
 
 **Objective:** Keep the dashboard implementation aligned with the future Meta Quest app, where Quest renders the body locally while Hermes remains the brain.
 
 **Files:**
 
-- Modify: `docs/avatar-dashboard.md` once it exists
+- Modify: `docs/avatar-dashboard.md`
 - Modify: this plan if transport decisions change
-- Optional later: create `docs/xr-quest-bridge.md`
+- Create: `docs/xr-quest-bridge.md`
 
 **Design notes:**
 
@@ -1057,17 +1059,18 @@ git commit -m "docs: scope embodied chat behavior to Lumina surface"
 
 **Verification:**
 
-- The docs explain the split clearly:
+- [x] The docs explain the split clearly:
   - Hermes/plugin = brain, tools, state, timeline
   - dashboard/Quest = renderers
   - Quest app = local XR rendering, headset input, spatial embodiment
-- No renderer-specific logic leaks into `avatar_state.py` or `avatar_timeline.py`.
+- [x] No renderer-specific logic leaks into `avatar_state.py` or `avatar_timeline.py`.
+- [x] Docs explicitly say Task 10 is not the Quest app implementation.
 
 **Commit:**
 
 ```bash
 git add docs/avatar-dashboard.md docs/xr-quest-bridge.md docs/plans/2026-05-13-vrm-avatar-dashboard.md
- git commit -m "docs: describe Lumina XR avatar event bridge"
+git commit -m "docs: describe Lumina XR avatar event bridge"
 ```
 
 ---
@@ -1191,4 +1194,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8 and Tasks 9A–9D are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. Next, continue with **Task 10: renderer-agnostic event transport notes for Meta Quest**.
+Tasks 1–8, Tasks 9A–9D, and Task 10 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Next, continue with **Task 11: improve liveliness without overbuilding**.

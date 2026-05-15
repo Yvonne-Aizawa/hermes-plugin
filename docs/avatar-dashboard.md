@@ -52,6 +52,20 @@ avatar_emit
 
 Use `avatar_emit` for speech subtitles, gestures, expressions, gaze, state patches, and VRMA animation events. Do not add one tool per gesture unless real usage proves the compact choreography tool is too awkward.
 
+## Renderer-agnostic Quest/XR alignment
+
+The dashboard is the current renderer, but the protocol should stay usable by a future Meta Quest app. The split is:
+
+- **Hermes/plugin:** brain, memory, tools, state, ordered timeline, protocol metadata.
+- **Dashboard renderer:** browser VRM rendering, chat panel, subtitles, debug overlay.
+- **Future Quest renderer:** local XR rendering, headset/controller/gaze input, local audio and animation playback.
+
+A Quest renderer should not call every internal Hermes tool directly. It should send normalized input/context into a Hermes-owned channel and consume renderer-facing state/events from a bridge.
+
+Dashboard v1 uses HTTP polling. A future Quest bridge should prefer WebSocket for state/events, and WebRTC data channels once realtime audio/interruption/co-presence becomes important. The event schema should remain the same even when the transport changes.
+
+See `docs/xr-quest-bridge.md` for the Quest bridge guardrails and non-goals.
+
 ## Session and history behavior
 
 Durable visible chat history comes from Hermes `SessionDB` for the stable Lumina channel:
