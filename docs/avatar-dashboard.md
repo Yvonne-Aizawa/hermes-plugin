@@ -160,10 +160,11 @@ A practical smoke test is:
 
 1. open `/lumina` in the dashboard;
 2. confirm the chat panel and avatar canvas load;
-3. send a short browser chat message;
-4. confirm the assistant reply appears in the chat panel;
-5. emit a small `speech.say` or `avatar.animation` event with `avatar_emit`;
-6. confirm the subtitle/animation appears without breaking the normal Telegram/Mattermost surfaces.
+3. use the `Fullscreen` button and confirm only the avatar stage/canvas expands, not the chat panel;
+4. send a short browser chat message;
+5. confirm the assistant reply appears in the chat panel;
+6. emit a small `speech.say` or `avatar.animation` event with `avatar_emit`;
+7. confirm the subtitle/animation appears without breaking the normal Telegram/Mattermost surfaces.
 
 ### 5. State vs timeline contract
 

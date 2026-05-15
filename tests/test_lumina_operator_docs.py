@@ -42,3 +42,10 @@ def test_plan_marks_task_12_complete():
     assert '## Task 12: Document operator workflow ✅' in source
     assert 'Someone should be able to clone/open the plugin' in source
     assert 'Task 12 is complete' in source
+
+
+def test_plan_tracks_avatar_only_fullscreen_control():
+    source = PLAN.read_text(encoding='utf-8')
+    assert '## Task 13: Add avatar-only fullscreen control ✅' in source
+    assert 'fullscreens the `.lumina-stage` avatar window' in source
+    assert 'not the chat panel' in source

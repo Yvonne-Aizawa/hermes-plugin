@@ -1123,7 +1123,7 @@ git add dashboard/src dashboard/dist
 
 ## Task 12: Document operator workflow ✅
 
-**Status:** Completed. `docs/avatar-dashboard.md` now includes the clone/open operator workflow: local asset paths, frontend install/build, dashboard and gateway restart commands, API routes, Hermes tools, state vs timeline contract, renderer responsibility split, animation constraints, and known limitations.
+**Status:** Completed. Task 12 is complete. `docs/avatar-dashboard.md` now includes the clone/open operator workflow: local asset paths, frontend install/build, dashboard and gateway restart commands, API routes, Hermes tools, state vs timeline contract, renderer responsibility split, animation constraints, and known limitations.
 
 **Objective:** Make future work obvious.
 
@@ -1159,6 +1159,30 @@ git add dashboard/src dashboard/dist
 git add README.md docs/avatar-dashboard.md docs/plans/2026-05-13-vrm-avatar-dashboard.md tests/test_lumina_operator_docs.py
 git commit -m "docs: document Lumina avatar dashboard workflow"
 ```
+
+---
+
+## Task 13: Add avatar-only fullscreen control ✅
+
+**Status:** Completed. `/lumina` now has a fullscreen control that fullscreens the `.lumina-stage` avatar window only, not the chat panel or the whole dashboard page. The button uses the browser Fullscreen API on the stage element, updates its accessible label while fullscreen is active, and dispatches a resize after fullscreen changes so the WebGL renderer can fit the new viewport.
+
+**Files:**
+
+- Modify: `dashboard/src/main.ts`
+- Modify: `dashboard/dist/index.js`
+- Modify: `dashboard/dist/style.css`
+- Modify: `docs/avatar-dashboard.md`
+- Modify: `tests/test_lumina_avatar_liveliness.py`
+- Modify: `tests/test_lumina_chat_layout_css.py`
+- Modify: `tests/test_lumina_operator_docs.py`
+
+**Verification:**
+
+- [x] Static regression test confirms the fullscreen call targets `stageRef.current` / `.lumina-stage`.
+- [x] CSS regression test confirms fullscreen styling is scoped to `.lumina-stage`, not `.lumina-chat-panel`.
+- [x] Frontend TypeScript typecheck passes.
+- [x] Dashboard bundle builds successfully.
+- [x] Plugin Python tests pass.
 
 ---
 
@@ -1206,4 +1230,4 @@ The second milestone is complete when:
 
 ## Recommended next step
 
-Tasks 1–8 and Tasks 9A–12 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Task 12 is complete: operators can now find asset paths, build/restart commands, routes, tools, state/timeline behavior, renderer boundaries, and limitations in `docs/avatar-dashboard.md`.
+Tasks 1–8 and Tasks 9A–13 are complete for the current milestone. Embodied/avatar behavior is scoped to `/lumina` by platform hint and documentation, while `avatar_get_state`/`avatar_emit` stay available globally for debugging until a later pass scopes them to the Lumina web interface/tool policy. The Quest bridge is documented as a future renderer path, not an immediate Quest app build. Task 13 is complete: `/lumina` has an avatar-only fullscreen button that targets the stage/canvas area without fullscreening the chat panel.

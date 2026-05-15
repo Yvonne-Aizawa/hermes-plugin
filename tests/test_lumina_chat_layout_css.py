@@ -35,3 +35,13 @@ def test_chat_message_text_wraps_instead_of_widening_layout():
 
     assert 'overflow-wrap: anywhere;' in block
     assert 'word-break: break-word;' in block
+
+
+def test_avatar_fullscreen_css_scopes_to_stage_only():
+    css = STYLE.read_text(encoding='utf-8')
+
+    assert '.lumina-fullscreen-toggle' in css
+    assert '.lumina-stage:fullscreen' in css
+    assert 'width: 100vw;' in css
+    assert 'height: 100vh;' in css
+    assert '.lumina-chat-panel:fullscreen' not in css

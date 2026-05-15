@@ -104,6 +104,7 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
   }
 
   function LuminaAvatarPage() {
+    const stageRef = useRef(null)
     const canvasHostRef = useRef(null)
     const viewerRef = useRef(null) as { current: AvatarViewerHandle | null }
     const timelineRef = useRef(null) as { current: TimelinePlayer | null }
@@ -133,12 +134,25 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
     const [chatSettings, setChatSettings] = useState(loadLuminaChatSettings)
     const [chatSettingsOpen, setChatSettingsOpen] = useState(false)
     const [overlayVisible, setOverlayVisible] = useState(false)
+    const [isAvatarFullscreen, setIsAvatarFullscreen] = useState(false)
     const toolCallMode = chatSettings.toolCallMode
     const visibleChatMessages = chatMessages.filter((message: ChatMessage) => message.role !== 'tool' || toolCallMode !== 'none')
 
     useEffect(function persistLuminaChatSettings() {
       saveLuminaChatSettings(chatSettings)
     }, [chatSettings])
+
+    useEffect(function watchAvatarFullscreenState() {
+      function onFullscreenChange() {
+        setIsAvatarFullscreen(document.fullscreenElement === stageRef.current)
+        window.setTimeout(() => window.dispatchEvent(new Event('resize')), 0)
+      }
+
+      document.addEventListener('fullscreenchange', onFullscreenChange)
+      return function cleanupFullscreenListener() {
+        document.removeEventListener('fullscreenchange', onFullscreenChange)
+      }
+    }, [])
 
     useEffect(function mountViewer() {
       const host = canvasHostRef.current as HTMLElement | null
@@ -363,12 +377,26 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
         })
     }
 
+    function handleAvatarFullscreenToggle() {
+      const stage = stageRef.current as HTMLElement | null
+      if (!stage) return
+
+      if (document.fullscreenElement === stage) {
+        document.exitFullscreen()
+          .catch((err: unknown) => console.warn('Lumina could not exit avatar fullscreen', err))
+        return
+      }
+
+      stage.requestFullscreen()
+        .catch((err: unknown) => console.warn('Lumina could not enter avatar fullscreen', err))
+    }
+
     return React.createElement(
       'section',
       { className: 'lumina-page lumina-avatar-page' },
       React.createElement(
         'div',
-        { className: 'lumina-stage' },
+        { ref: stageRef, className: 'lumina-stage' },
         React.createElement('div', { ref: canvasHostRef, className: 'lumina-canvas-host', role: 'img', 'aria-label': 'Lumina avatar WebGL canvas' }),
         !viewerStatus.webglAvailable && React.createElement(
           'div',
@@ -376,6 +404,17 @@ const TOOL_CALL_MODE_OPTIONS: Array<{ value: ToolCallMode; label: string; descri
           'WebGL is unavailable in this browser, so Lumina cannot render her avatar body here yet.'
         ),
         subtitle && React.createElement('div', { className: 'lumina-subtitle', role: 'status' }, subtitle),
+        React.createElement(
+          'button',
+          {
+            className: 'lumina-fullscreen-toggle',
+            type: 'button',
+            'aria-label': isAvatarFullscreen ? 'Exit avatar fullscreen' : 'Fullscreen avatar',
+            'aria-pressed': isAvatarFullscreen,
+            onClick: handleAvatarFullscreenToggle,
+          },
+          isAvatarFullscreen ? 'Exit fullscreen' : 'Fullscreen'
+        ),
         React.createElement(
           'button',
           {

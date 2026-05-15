@@ -45,6 +45,21 @@ def test_one_shot_animations_return_to_idle_and_persist_idle_state():
     assert "emitAvatar(sdk.fetchJSON, { state: { animation: 'idle' } })" in main_source
 
 
+def test_avatar_fullscreen_control_targets_stage_not_chat_or_page():
+    source = MAIN_TS.read_text(encoding='utf-8')
+
+    assert 'const stageRef = useRef(null)' in source
+    assert 'function handleAvatarFullscreenToggle()' in source
+    assert "stageRef.current as HTMLElement | null" in source
+    assert 'stage.requestFullscreen()' in source
+    assert 'document.exitFullscreen()' in source
+    assert "aria-label': isAvatarFullscreen ? 'Exit avatar fullscreen' : 'Fullscreen avatar'" in source
+    assert "className: 'lumina-stage'" in source
+    assert "ref: stageRef" in source
+    assert 'chatPanelRef' not in source
+    assert 'document.documentElement.requestFullscreen' not in source
+
+
 def test_plan_marks_task_11_complete_after_liveliness_work():
     source = PLAN_MD.read_text(encoding='utf-8')
 
